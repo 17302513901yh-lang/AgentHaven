@@ -7,6 +7,22 @@ const os = require('node:os');
 const crypto = require('node:crypto');
 
 const STATUSES = ['todo', 'doing', 'blocked', 'review', 'done'];
+const ACTIVE = ['doing', 'blocked', 'review'];
+const WORKSPACE_RE = /^[a-zA-Z0-9_-]{1,64}$/;
+
+const normFile = (f) => String(f).trim().replace(/\\/g, '/').replace(/^\.\//, '').replace(/\/+$/, '');
+const normFiles = (files) => (Array.isArray(files) ? [...new Set(files.map(normFile).filter(Boolean))].slice(0, 100) : []);
+// Paths overlap when equal or when one is a directory prefix of the other.
+const overlaps = (a, b) => a === b || a.startsWith(`${b}/`) || b.startsWith(`${a}/`);
+
+// Throws when another agent is actively working on any of these files.
+function assertFilesFree(data, taskId, actor, files) {
+  for (const other of data.tasks) {
+    if (other.id === taskId || !ACTIVE.includes(other.status) || !other.assignee || other.assignee === actor) continue;
+    const hit = files.find((f) => other.files.some((g) => overlaps(f, g)));
+    if (hit) throw new ConflictError(`${hit} is being worked on by ${other.assignee} in "${other.title}" (${other.id})`, other);
+  }
+}
 
 class ConflictError extends Error {
   constructor(message, current) {
@@ -54,8 +70,9 @@ const now = () => new Date().toISOString();
 
 class Store {
   constructor({ dataDir = defaultDataDir(), workspace = 'default' } = {}) {
-    if (!/^[a-zA-Z0-9_-]{1,64}$/.test(workspace)) throw new ValidationError('invalid workspace name');
+    if (!WORKSPACE_RE.test(workspace)) throw new ValidationError('invalid workspace name');
     this.dataDir = dataDir;
+    this.workspace = workspace;
     this.file = path.join(dataDir, `${workspace}.json`);
     fs.mkdirSync(dataDir, { recursive: true });
   }
@@ -125,7 +142,7 @@ class Store {
       description: optionalText(description, 'description') || '',
       status: 'todo',
       assignee: null,
-      files: Array.isArray(files) ? files.map(String).slice(0, 100) : [],
+      files: normFiles(files),
       createdBy: actor,
       createdAt: now(),
       updatedAt: now(),
@@ -157,8 +174,10 @@ class Store {
         applied.status = changes.status;
       }
       if (changes.assignee !== undefined) applied.assignee = changes.assignee === null ? null : requireText(changes.assignee, 'assignee', 100);
-      if (changes.files !== undefined) applied.files = Array.isArray(changes.files) ? changes.files.map(String).slice(0, 100) : [];
+      if (changes.files !== undefined) applied.files = normFiles(changes.files);
       if (!Object.keys(applied).length) throw new ValidationError('nothing to update');
+      const next = { ...task, ...applied };
+      if (ACTIVE.includes(next.status) && next.assignee) assertFilesFree(data, id, next.assignee, next.files);
       Object.assign(task, applied, { updatedAt: now(), lastActor: actor, version: task.version + 1 });
       Store.log(data, actor, 'task.updated', id, applied);
       return task;
@@ -171,6 +190,7 @@ class Store {
       const task = data.tasks.find((t) => t.id === id);
       if (!task) throw new ValidationError(`task ${id} not found`);
       if (task.assignee && task.assignee !== actor) throw new ConflictError(`task is already claimed by ${task.assignee}`, task);
+      assertFilesFree(data, id, actor, task.files);
       Object.assign(task, { assignee: actor, status: task.status === 'todo' ? 'doing' : task.status, updatedAt: now(), lastActor: actor, version: task.version + 1 });
       Store.log(data, actor, 'task.claimed', id);
       return task;
@@ -185,6 +205,7 @@ class Store {
       const task = data.tasks.find((t) => t.id === id);
       if (!task) throw new ValidationError(`task ${id} not found`);
       if (task.assignee && task.assignee !== actor) throw new ConflictError(`only ${task.assignee} can hand off this task`, task);
+      if (target) assertFilesFree(data, id, target, task.files);
       const entry = { at: now(), from: actor, to: target, summary, nextSteps: optionalText(nextSteps, 'nextSteps') || '' };
       task.handoffs = [...(task.handoffs || []), entry];
       Object.assign(task, { assignee: target, status: target ? 'doing' : 'todo', updatedAt: now(), lastActor: actor, version: task.version + 1 });
@@ -215,9 +236,35 @@ class Store {
     });
   }
 
+  deleteTask(id, { version, actor }) {
+    actor = requireText(actor, 'actor', 100);
+    return this.withLock((data) => {
+      const i = data.tasks.findIndex((t) => t.id === id);
+      if (i < 0) throw new ValidationError(`task ${id} not found`);
+      if (data.tasks[i].version !== version) throw new ConflictError('task was changed; re-read and retry', data.tasks[i]);
+      const [task] = data.tasks.splice(i, 1);
+      Store.log(data, actor, 'task.deleted', id, task.title);
+      return { deleted: id };
+    });
+  }
+
+  // Which files are currently being worked on, and by whom.
+  fileClaims() {
+    return this.read().tasks
+      .filter((t) => ACTIVE.includes(t.status) && t.assignee && t.files.length)
+      .flatMap((t) => t.files.map((file) => ({ file, agent: t.assignee, task: t.id, title: t.title })));
+  }
+
+  static listWorkspaces(dataDir = defaultDataDir()) {
+    try {
+      const names = fs.readdirSync(dataDir).filter((f) => f.endsWith('.json')).map((f) => f.slice(0, -5)).filter((n) => WORKSPACE_RE.test(n));
+      return [...new Set(['default', ...names])].sort();
+    } catch { return ['default']; }
+  }
+
   activity({ limit = 50 } = {}) {
     return this.read().log.slice(-Math.min(Math.max(1, limit), 500)).reverse();
   }
 }
 
-module.exports = { Store, ConflictError, ValidationError, STATUSES, defaultDataDir };
+module.exports = { Store, ConflictError, ValidationError, STATUSES, ACTIVE, defaultDataDir, overlaps };

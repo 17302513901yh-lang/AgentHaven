@@ -34,6 +34,12 @@ const TOOLS = [
   { name: 'search_notes', description: 'Search shared project memory.',
     inputSchema: { type: 'object', properties: { query: str('Text to search for; omit for all notes') } },
     run: (s, a) => s.listNotes(a) },
+  { name: 'file_claims', description: 'Show which files other agents are actively working on. Check before editing files; add files to your task so others see them.',
+    inputSchema: { type: 'object', properties: {} },
+    run: (s) => s.fileClaims() },
+  { name: 'delete_task', description: 'Delete a task (e.g. a duplicate). Pass the version you last read.',
+    inputSchema: { type: 'object', properties: { id: str('Task id'), version: { type: 'integer' } }, required: ['id', 'version'] },
+    run: (s, a, actor) => s.deleteTask(a.id, { version: a.version, actor }) },
   { name: 'recent_activity', description: 'Show the latest activity log entries (who did what).',
     inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 500 } } },
     run: (s, a) => s.activity(a) },
@@ -54,7 +60,7 @@ function createHandler({ store = new Store({ workspace: process.env.AGENTHAVEN_W
           protocolVersion: PROTOCOL_VERSIONS.includes(requested) ? requested : PROTOCOL_VERSIONS[0],
           capabilities: { tools: {} },
           serverInfo: { name: 'agenthaven', version: pkg.version },
-          instructions: 'AgentHaven is a shared workspace with other AI agents. Check list_tasks before starting, claim_task before working, and handoff_task with a summary when you stop.',
+          instructions: 'AgentHaven is a shared workspace with other AI agents. Check list_tasks before starting, list the files you will touch on your task, claim_task before working (it fails if another agent holds those files), and handoff_task with a summary when you stop.',
         });
       }
       case 'ping': return reply({});

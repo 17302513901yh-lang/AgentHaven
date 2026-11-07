@@ -1,62 +1,63 @@
 # AgentHaven
 
-**Alle AI's. Eén gedeelde werkplek.**
+**All your agents. One shared workspace.**
 
-[Bezoek de website en probeer de conceptdemo](https://laaielichter.github.io/AgentHaven/).
+[Visit the website and try the concept demo](https://laaielichter.github.io/AgentHaven/).
 
-AgentHaven wordt een lokale werkplek waar mensen en verschillende AI-agents samen aan projecten werken. Een gedeeld werkbord en projectgeheugen maken zichtbaar wat er moet gebeuren, wie ermee bezig is en welke kennis een volgende agent nodig heeft.
+AgentHaven is a local workspace where people and different AI agents work on projects together. A shared task board and project memory show what needs to be done, who is working on it, and what context the next agent needs.
 
 ## Status
 
-Eerste werkende versie (0.1, alfa): een desktop-app voor Windows en macOS, een lokaal dashboard en een MCP-agentplugin. De installers zijn nog niet ondertekend.
+Version 0.2 (alpha): a desktop app for Windows and macOS with automatic updates, multiple workspaces, file claims, and one-click connection to Claude Desktop, Cursor and Windsurf. Installers are signed once the signing secrets are configured (see below).
 
-## Installeren
+## Install
 
-**Desktop-app:** download de `.exe` (Windows) of `.dmg` (macOS) bij [Releases](https://github.com/laaielichter/AgentHaven/releases) of als artefact van de laatste CI-run.
-Omdat de builds nog niet ondertekend zijn: op Windows kies je *Meer info → Toch uitvoeren*; op macOS klik je rechts op de app en kies je *Open*.
+**Desktop app:** download the `.exe` (Windows) or `.dmg` (macOS) from [Releases](https://github.com/laaielichter/AgentHaven/releases), or as an artifact of the latest CI run.
+Unsigned builds: on Windows choose *More info → Run anyway*; on macOS right-click the app and choose *Open*.
 
-**Een agent aansluiten:** kies in de app *Agents → Copy MCP Config for …* en plak de configuratie in de MCP-instellingen van je agent (bijvoorbeeld `claude_desktop_config.json` of `.cursor/mcp.json`). Herstart daarna de agent.
+**Connect an agent:** in the app choose *Agents → Connect Claude Desktop* (or Cursor/Windsurf) and restart that app. Your existing configuration is kept and a `.agenthaven-backup` copy is made. For other agents (Claude Code, Codex, VS Code) use *Agents → Copy MCP Config*.
 
-**Zonder app (Node.js 20+):**
+**Without the app (Node.js 20+):**
 
 ```sh
-node bin/agenthaven.js serve                 # dashboard op http://127.0.0.1:4777
-node bin/agenthaven.js config --agent claude # MCP-config voor je agent
-node bin/agenthaven.js mcp --agent claude    # de plugin zelf (stdio)
+node bin/agenthaven.js serve                 # dashboard at http://127.0.0.1:4777
+node bin/agenthaven.js config --agent claude # MCP config snippet for your agent
+node bin/agenthaven.js mcp --agent claude    # the plugin itself (stdio)
 ```
 
-Agents krijgen de tools `list_tasks`, `get_task`, `create_task`, `claim_task`, `update_task`, `handoff_task`, `add_note`, `search_notes` en `recent_activity`.
+Agents get the tools `list_tasks`, `get_task`, `create_task`, `claim_task`, `update_task`, `handoff_task`, `delete_task`, `add_note`, `search_notes`, `file_claims` and `recent_activity`. Put the files you work on in your task: another agent then cannot claim a task that touches the same files (or folders).
 
-Gegevens staan lokaal in `%APPDATA%\AgentHaven` (Windows), `~/Library/Application Support/AgentHaven` (macOS) of `~/.local/share/agenthaven` (Linux); te wijzigen met `AGENTHAVEN_HOME`.
+Data is stored locally in `%APPDATA%\AgentHaven` (Windows), `~/Library/Application Support/AgentHaven` (macOS) or `~/.local/share/agenthaven` (Linux); override with `AGENTHAVEN_HOME`.
 
-## Ontwikkelen
+## Development
 
 ```sh
 npm install
-npm run lint && npm test   # tests draaien zonder Electron
-npm run app                # desktop-app starten
-npm run dist:win           # of dist:mac — installer in dist/
+npm run lint && npm test   # tests run without Electron
+npm run app                # start the desktop app
+npm run dist:win           # or dist:mac — installer in dist/
 ```
 
-## Wat we willen bouwen
+## Releasing and signing
 
-- **Werkbord:** taken aanmaken, oppakken, bijwerken en hulp vragen.
-- **Projectgeheugen:** context, uitleg, afspraken en beslissingen vastleggen.
-- **Overdracht:** werk overdragen met de relevante context en resultaten.
-- **Afstemming:** laten zien welke agent aan welke taak of bestanden werkt.
-- **Menselijk overzicht:** de gebruiker kan meekijken en bijsturen.
-- **Aansluitingen:** verschillende AI-programma's toegang geven tot dezelfde lokale werkplek.
+Pushing a tag `vX.Y.Z` (matching `version` in `package.json`) builds the installers and creates a draft release. Publish that release; automatic updates read `latest.yml` / `latest-mac.yml` from the published release.
 
-## Uitgangspunten
+Repository secrets for signing (optional; without them builds are unsigned):
 
-Projectgegevens worden standaard lokaal bewaard. De gebruiker bepaalt welke projecten en gegevens een aangesloten agent mag gebruiken. Een lokale werkplek betekent niet dat aangesloten cloud-AI's ook lokaal rekenen; gegevensverwerking hangt af van de gekozen aansluiting.
+| Secret | Purpose |
+|---|---|
+| `WIN_CSC_LINK`, `WIN_CSC_KEY_PASSWORD` | Windows code signing certificate (.pfx, base64) and password |
+| `MAC_CSC_LINK`, `MAC_CSC_KEY_PASSWORD` | Apple *Developer ID Application* certificate (.p12, base64) and password |
+| `APPLE_ID`, `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID` | macOS notarization (required for auto-update and Gatekeeper) |
 
-Taken en wijzigingen moeten herleidbaar zijn tot een agent of gebruiker. Samenwerking moet rekening houden met gelijktijdige wijzigingen en voorkomen dat agents elkaars werk stilzwijgend overschrijven.
+## Principles
 
-Wachtwoorden, API-sleutels, persoonlijke projectgegevens en lokale sessiegegevens horen niet in deze publieke repository.
+Project data is stored locally by default. You decide which projects and data a connected agent may use. A local workspace does not mean connected cloud AIs compute locally; data processing depends on the chosen connection.
 
-## Volgende stappen
+Tasks and changes are traceable to an agent or user. Collaboration accounts for concurrent edits and prevents agents from silently overwriting each other's work.
 
-- Code signing en notarisatie (Windows-certificaat, Apple Developer ID) en automatische updates.
-- Meerdere projecten/werkplekken in de app kiezen.
-- Bestandsclaims afdwingen zodat agents niet in dezelfde bestanden werken.
+Passwords, API keys, personal project data and local session data do not belong in this public repository.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

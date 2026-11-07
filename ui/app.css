@@ -24,3 +24,15 @@ button.ghost{background:transparent;color:var(--ink);border-color:var(--line);fo
 .list{list-style:none;padding:0;margin:0 0 24px}.list li{border-bottom:1px solid var(--line);padding:8px 0}
 .list.small li{font-size:13px}.list .m{color:var(--muted);font-size:12px}
 .empty{color:var(--muted);font-size:13px}
+.top-right{display:flex;align-items:center;gap:8px}.m{color:var(--muted);font-size:12px}
+.card{display:block;width:100%;text-align:left;font-weight:400;color:var(--ink);cursor:grab}
+.card:hover{border-color:var(--ink)}.card>span{display:block}.files{font-family:ui-monospace,monospace}
+.col.over{outline:2px dashed var(--ink)}
+.onboarding{margin-top:16px;padding:16px;border:1px dashed var(--line);border-radius:12px}
+.onboarding h3{margin:0 0 6px}code{font-family:ui-monospace,monospace;font-size:12px}
+.full{width:100%;margin-bottom:8px}details{margin-bottom:8px}summary{cursor:pointer;font-size:13px;margin-bottom:8px}
+.list .body{white-space:pre-wrap}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--paper);color:var(--ink);width:min(560px,92vw);padding:20px}
+dialog::backdrop{background:rgb(0 0 0 / .35)}dialog label{display:grid;gap:4px;font-size:13px}
+.row{display:flex;gap:8px;align-items:center}.grow{flex:1}
+button.danger{background:transparent;color:#c0392b;border-color:#c0392b}

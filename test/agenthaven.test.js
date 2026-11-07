@@ -93,3 +93,68 @@ test('HTTP API: CRUD, conflict status, host/origin protection, UI', async () => 
     server.close();
   }
 });
+
+test('file claims: overlapping files block other agents, not the owner', () => {
+  const s = tmpStore();
+  const a = s.createTask({ title: 'Refactor', files: ['./src/', 'README.md'], actor: 'claude' });
+  assert.deepEqual(a.files, ['src', 'README.md']);
+  s.claimTask(a.id, { actor: 'claude' });
+  const b = s.createTask({ title: 'Fix', files: ['src\\store.js'], actor: 'cursor' });
+  assert.equal(b.files[0], 'src/store.js');
+  assert.throws(() => s.claimTask(b.id, { actor: 'cursor' }), (err) => err.code === 'CONFLICT' && /claude/.test(err.message));
+  s.handoff(a.id, { actor: 'claude', to: 'codex', summary: 'x' });
+  assert.throws(() => s.claimTask(b.id, { actor: 'cursor' }), /codex/);
+  const c = s.createTask({ title: 'Docs', files: ['docs/index.html'], actor: 'cursor' });
+  assert.equal(s.claimTask(c.id, { actor: 'cursor' }).assignee, 'cursor');
+  const claims = s.fileClaims();
+  assert.ok(claims.some((x) => x.file === 'docs/index.html' && x.agent === 'cursor'));
+  const fresh = s.getTask(c.id);
+  assert.throws(() => s.updateTask(c.id, { version: fresh.version, files: ['src/x.js'], actor: 'cursor' }), { code: 'CONFLICT' });
+});
+
+test('delete task needs the current version', () => {
+  const s = tmpStore();
+  const t = s.createTask({ title: 'Dup', actor: 'a' });
+  assert.throws(() => s.deleteTask(t.id, { version: 99, actor: 'a' }), { code: 'CONFLICT' });
+  assert.deepEqual(s.deleteTask(t.id, { version: 1, actor: 'a' }), { deleted: t.id });
+  assert.equal(s.listTasks().length, 0);
+});
+
+test('workspaces are isolated and listed', async () => {
+  const s = tmpStore();
+  const { server, url } = await start({ dataDir: s.dataDir });
+  try {
+    const json = { 'Content-Type': 'application/json' };
+    await fetch(`${url}api/tasks?workspace=alpha`, { method: 'POST', headers: json, body: '{"title":"A"}' });
+    assert.equal((await (await fetch(`${url}api/tasks?workspace=alpha`)).json()).length, 1);
+    assert.equal((await (await fetch(`${url}api/tasks`)).json()).length, 0);
+    assert.deepEqual(await (await fetch(`${url}api/workspaces`)).json(), ['alpha', 'default']);
+    assert.equal((await fetch(`${url}api/tasks?workspace=..%2Fx`)).status, 400);
+    const [task] = await (await fetch(`${url}api/tasks?workspace=alpha`)).json();
+    assert.equal((await fetch(`${url}api/tasks/${task.id}?workspace=alpha&version=1`, { method: 'DELETE' })).status, 200);
+  } finally {
+    server.close();
+  }
+});
+
+test('connect: merges into client config without losing settings, refuses broken JSON', () => {
+  const connect = require('../src/connect');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-home-'));
+  const opts = { home, platform: 'darwin', env: {} };
+  const file = connect.clients(opts).claude.file;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify({ theme: 'dark', mcpServers: { other: { command: 'x' } } }));
+  const entry = connect.serverEntry({ command: '/app', script: '/app/bin/agenthaven.js', agent: 'claude', extraEnv: { ELECTRON_RUN_AS_NODE: '1' } });
+  connect.install('claude', entry, opts);
+  const cfg = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.equal(cfg.theme, 'dark');
+  assert.ok(cfg.mcpServers.other);
+  assert.deepEqual(cfg.mcpServers.agenthaven.args, ['/app/bin/agenthaven.js', 'mcp', '--agent', 'claude', '--workspace', 'default']);
+  assert.ok(fs.existsSync(`${file}.agenthaven-backup`));
+  const cursor = connect.clients(opts).cursor.file;
+  fs.mkdirSync(path.dirname(cursor), { recursive: true });
+  fs.writeFileSync(cursor, '{ broken');
+  assert.throws(() => connect.install('cursor', entry, opts), /not valid JSON/);
+  assert.equal(fs.readFileSync(cursor, 'utf8'), '{ broken');
+  assert.match(connect.clients({ home, platform: 'win32', env: { APPDATA: 'C:\\U\\AppData' } }).claude.file, /Claude/);
+});

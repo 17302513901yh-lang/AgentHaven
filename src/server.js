@@ -9,15 +9,26 @@ const { Store } = require('./store');
 const UI_DIR = path.join(__dirname, '..', 'ui');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 
-function createServer({ store = new Store(), human = 'you' } = {}) {
+function createServer({ store, dataDir, human = 'you' } = {}) {
+  // One Store per workspace, selected with ?workspace=name (default: "default").
+  const stores = new Map();
+  if (store) { dataDir ||= store.dataDir; stores.set(store.workspace, store); }
+  const pick = (q) => {
+    const name = q.get('workspace') || (store ? store.workspace : 'default');
+    if (!stores.has(name)) stores.set(name, new Store({ dataDir, workspace: name }));
+    return stores.get(name);
+  };
   const routes = [
-    ['GET', /^\/api\/tasks$/, (q) => store.listTasks({ status: q.get('status') || undefined, assignee: q.get('assignee') || undefined })],
-    ['POST', /^\/api\/tasks$/, (q, b) => store.createTask({ ...b, actor: human })],
-    ['PATCH', /^\/api\/tasks\/([\w-]+)$/, (q, b, id) => store.updateTask(id, { ...b, actor: human })],
-    ['POST', /^\/api\/tasks\/([\w-]+)\/handoff$/, (q, b, id) => store.handoff(id, { ...b, actor: human })],
-    ['GET', /^\/api\/notes$/, (q) => store.listNotes({ query: q.get('q') || undefined })],
-    ['POST', /^\/api\/notes$/, (q, b) => store.addNote({ ...b, actor: human })],
-    ['GET', /^\/api\/activity$/, (q) => store.activity({ limit: Number(q.get('limit')) || 50 })],
+    ['GET', /^\/api\/tasks$/, (q) => pick(q).listTasks({ status: q.get('status') || undefined, assignee: q.get('assignee') || undefined })],
+    ['POST', /^\/api\/tasks$/, (q, b) => pick(q).createTask({ ...b, actor: human })],
+    ['PATCH', /^\/api\/tasks\/([\w-]+)$/, (q, b, id) => pick(q).updateTask(id, { ...b, actor: human })],
+    ['POST', /^\/api\/tasks\/([\w-]+)\/handoff$/, (q, b, id) => pick(q).handoff(id, { ...b, actor: human })],
+    ['GET', /^\/api\/notes$/, (q) => pick(q).listNotes({ query: q.get('q') || undefined })],
+    ['POST', /^\/api\/notes$/, (q, b) => pick(q).addNote({ ...b, actor: human })],
+    ['DELETE', /^\/api\/tasks\/([\w-]+)$/, (q, b, id) => pick(q).deleteTask(id, { version: Number(q.get('version')), actor: human })],
+    ['GET', /^\/api\/claims$/, (q) => pick(q).fileClaims()],
+    ['GET', /^\/api\/workspaces$/, () => Store.listWorkspaces(dataDir || require('./store').defaultDataDir())],
+    ['GET', /^\/api\/activity$/, (q) => pick(q).activity({ limit: Number(q.get('limit')) || 50 })],
   ];
 
   const server = http.createServer((req, res) => {
@@ -42,7 +53,7 @@ function createServer({ store = new Store(), human = 'you' } = {}) {
         req.on('data', (c) => { raw += c; if (raw.length > 1e6) req.destroy(); });
         req.on('end', () => {
           try {
-            if (req.method !== 'GET' && !String(req.headers['content-type']).startsWith('application/json')) return send(415, { error: 'use application/json' });
+            if (!['GET', 'DELETE'].includes(req.method) && !String(req.headers['content-type']).startsWith('application/json')) return send(415, { error: 'use application/json' });
             const body = raw ? JSON.parse(raw) : {};
             send(req.method === 'POST' ? 201 : 200, fn(url.searchParams, body, m[1]));
           } catch (err) {

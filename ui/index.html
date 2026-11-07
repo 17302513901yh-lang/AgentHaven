@@ -10,7 +10,12 @@
 <body>
 <header class="top">
   <div class="brand"><img src="./favicon.svg" alt="" width="28" height="28"> AgentHaven</div>
-  <span id="status" class="status" role="status" aria-live="polite">Connecting…</span>
+  <div class="top-right">
+    <label for="workspace" class="m">Workspace</label>
+    <select id="workspace"></select>
+    <button type="button" id="new-workspace" class="ghost">+ New</button>
+    <span id="status" class="status" role="status" aria-live="polite">Connecting…</span>
+  </div>
 </header>
 <main class="layout">
   <section aria-labelledby="board-h">
@@ -18,22 +23,36 @@
       <h2 id="board-h">Task board</h2>
       <form id="new-task" class="inline-form">
         <label class="sr" for="task-title">New task</label>
-        <input id="task-title" name="title" placeholder="New task…" required maxlength="200">
+        <input id="task-title" name="title" placeholder="New task… (press Enter)" required maxlength="200">
         <button type="submit">Add</button>
       </form>
     </div>
     <div id="board" class="board"></div>
+    <div id="onboarding" class="onboarding" hidden>
+      <h3>Connect your first agent</h3>
+      <p>In the menu choose <strong>Agents → Connect Claude Desktop</strong> (or Cursor/Windsurf) and restart that app. For other agents use <strong>Agents → Copy MCP Config</strong>.</p>
+      <p>Then ask your agent: <em>"Check the AgentHaven board and pick up a task."</em></p>
+    </div>
   </section>
   <aside>
+    <section aria-labelledby="claims-h">
+      <h2 id="claims-h">Files in use</h2>
+      <ul id="claims" class="list small"></ul>
+    </section>
     <section aria-labelledby="notes-h">
       <h2 id="notes-h">Project memory</h2>
-      <form id="new-note" class="stack">
-        <label class="sr" for="note-title">Note title</label>
-        <input id="note-title" name="title" placeholder="Title" required maxlength="200">
-        <label class="sr" for="note-body">Note</label>
-        <textarea id="note-body" name="body" placeholder="Decision, convention, context…" required rows="3"></textarea>
-        <button type="submit">Save note</button>
-      </form>
+      <label class="sr" for="note-search">Search notes</label>
+      <input id="note-search" type="search" placeholder="Search notes…" class="full">
+      <details>
+        <summary>Add note</summary>
+        <form id="new-note" class="stack">
+          <label class="sr" for="note-title">Note title</label>
+          <input id="note-title" name="title" placeholder="Title" required maxlength="200">
+          <label class="sr" for="note-body">Note</label>
+          <textarea id="note-body" name="body" placeholder="Decision, convention, context…" required rows="3"></textarea>
+          <button type="submit">Save note</button>
+        </form>
+      </details>
       <ul id="notes" class="list"></ul>
     </section>
     <section aria-labelledby="log-h">
@@ -42,5 +61,30 @@
     </section>
   </aside>
 </main>
+
+<dialog id="task-dialog" aria-labelledby="dlg-h">
+  <form id="task-form" method="dialog" class="stack">
+    <h2 id="dlg-h">Task</h2>
+    <label>Title <input name="title" required maxlength="200"></label>
+    <label>Description <textarea name="description" rows="4"></textarea></label>
+    <label>Status <select name="status"></select></label>
+    <label>Assignee <input name="assignee" placeholder="unassigned" maxlength="100"></label>
+    <label>Files (one per line) <textarea name="files" rows="3" placeholder="src/app.js"></textarea></label>
+    <div id="dlg-handoffs" class="m"></div>
+    <div class="row">
+      <button type="button" id="dlg-delete" class="danger">Delete</button>
+      <span class="grow"></span>
+      <button type="button" id="dlg-cancel" class="ghost">Cancel</button>
+      <button type="submit" value="save">Save</button>
+    </div>
+  </form>
+</dialog>
+<dialog id="ws-dialog" aria-labelledby="ws-h">
+  <form id="ws-form" method="dialog" class="stack">
+    <h2 id="ws-h">New workspace</h2>
+    <label>Name (letters, digits, - and _) <input name="name" required pattern="[A-Za-z0-9_\-]{1,64}"></label>
+    <div class="row"><span class="grow"></span><button type="button" id="ws-cancel" class="ghost">Cancel</button><button type="submit">Create</button></div>
+  </form>
+</dialog>
 </body>
 </html>
