@@ -23,4 +23,14 @@
 - Conventional commits (`feat:`, `ci:`, `docs:`).
 
 ## Access
-- The GitHub integration here is read-only on laaielichter/AgentHaven (403 on branch create). Deliver as bundle + patches + Codex prompt; owner pushes.
+- Access depends on the current session. A regular Git push requires its own authenticated credentials; repository permissions reported by a connector do not authenticate the local Git client.
+- Files in another agent session are not automatically available here. Transfer prepared work through a pushed Git branch or an attached bundle/patch archive.
+- The supplied bundle exported `HEAD`, not the documented feature branch ref. After `git bundle verify`, import it with `git fetch /path/to/agenthaven-feature.bundle HEAD:refs/heads/feat/desktop-app-and-mcp-plugin`.
+
+## Verification for the 0.2 PR
+- `npm ci` completed on Linux; the committed lockfile is present and the desktop CI job already uses `npm ci` without a lockfile TODO.
+- Lint and all 10 tests passed on Linux with Node 24.22.1 and Node 22.23.4.
+- `build/icon.png` is a 1024x1024 PNG.
+- Windows/macOS installer builds and actual installed-app smoke tests remain pending. Linux tests do not establish native desktop verification.
+- No signing certificates were supplied; signing and notarization have not been verified.
+- Release tagging must wait until the owner merges the PR. Keep the first release a draft.
