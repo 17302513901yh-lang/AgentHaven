@@ -31,6 +31,8 @@
 - `npm ci` completed on Linux; the committed lockfile is present and the desktop CI job already uses `npm ci` without a lockfile TODO.
 - Lint and all 10 tests passed on Linux with Node 24.22.1 and Node 22.23.4.
 - `build/icon.png` is a 1024x1024 PNG.
-- Windows/macOS installer builds and actual installed-app smoke tests remain pending. Linux tests do not establish native desktop verification.
+- PR CI passed lint and all 10 tests on real Windows, macOS and Ubuntu runners; both native installer builds and CodeQL passed.
+- Both downloaded artifact ZIPs passed integrity checks. Windows includes the NSIS installer, blockmap and `latest.yml`; macOS includes universal DMG/ZIP, blockmaps and `latest-mac.yml`.
+- Native installed-app smoke tests and Claude Desktop tool discovery remain unverified: this session provides Linux only. Local Chromium failed to start because process-singleton socket creation was denied; the shared browser could not reach the local dashboard. No screenshot or native UI result is claimed.
 - No signing certificates were supplied; signing and notarization have not been verified.
-- Release tagging must wait until the owner merges the PR. Keep the first release a draft.
+- The owner authorized autonomous squash merge. The release job bootstraps `v0.2.0` once on a green main-branch run, never retargets an existing tag, and leaves the release as a draft. Later releases still use version tags.
