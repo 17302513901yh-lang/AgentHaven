@@ -8,7 +8,35 @@ AgentHaven wordt een lokale werkplek waar mensen en verschillende AI-agents same
 
 ## Status
 
-Dit project staat aan het begin: deze repository bevat de productvisie. Er is nog geen werkende applicatie of installeerbare plugin.
+Eerste werkende versie (0.1, alfa): een desktop-app voor Windows en macOS, een lokaal dashboard en een MCP-agentplugin. De installers zijn nog niet ondertekend.
+
+## Installeren
+
+**Desktop-app:** download de `.exe` (Windows) of `.dmg` (macOS) bij [Releases](https://github.com/laaielichter/AgentHaven/releases) of als artefact van de laatste CI-run.
+Omdat de builds nog niet ondertekend zijn: op Windows kies je *Meer info → Toch uitvoeren*; op macOS klik je rechts op de app en kies je *Open*.
+
+**Een agent aansluiten:** kies in de app *Agents → Copy MCP Config for …* en plak de configuratie in de MCP-instellingen van je agent (bijvoorbeeld `claude_desktop_config.json` of `.cursor/mcp.json`). Herstart daarna de agent.
+
+**Zonder app (Node.js 20+):**
+
+```sh
+node bin/agenthaven.js serve                 # dashboard op http://127.0.0.1:4777
+node bin/agenthaven.js config --agent claude # MCP-config voor je agent
+node bin/agenthaven.js mcp --agent claude    # de plugin zelf (stdio)
+```
+
+Agents krijgen de tools `list_tasks`, `get_task`, `create_task`, `claim_task`, `update_task`, `handoff_task`, `add_note`, `search_notes` en `recent_activity`.
+
+Gegevens staan lokaal in `%APPDATA%\AgentHaven` (Windows), `~/Library/Application Support/AgentHaven` (macOS) of `~/.local/share/agenthaven` (Linux); te wijzigen met `AGENTHAVEN_HOME`.
+
+## Ontwikkelen
+
+```sh
+npm install
+npm run lint && npm test   # tests draaien zonder Electron
+npm run app                # desktop-app starten
+npm run dist:win           # of dist:mac — installer in dist/
+```
 
 ## Wat we willen bouwen
 
@@ -27,6 +55,8 @@ Taken en wijzigingen moeten herleidbaar zijn tot een agent of gebruiker. Samenwe
 
 Wachtwoorden, API-sleutels, persoonlijke projectgegevens en lokale sessiegegevens horen niet in deze publieke repository.
 
-## Eerste mijlpaal
+## Volgende stappen
 
-Een klein lokaal prototype voor één project, met een takenbord, gedeelde notities en een overdrachtslogboek. Daarna kunnen aansluitingen voor meerdere AI-programma's worden toegevoegd. Technologie en aansluitprotocol worden nog gekozen.
+- Code signing en notarisatie (Windows-certificaat, Apple Developer ID) en automatische updates.
+- Meerdere projecten/werkplekken in de app kiezen.
+- Bestandsclaims afdwingen zodat agents niet in dezelfde bestanden werken.

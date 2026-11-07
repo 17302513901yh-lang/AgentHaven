@@ -1,0 +1,26 @@
+:root{--paper:#f7f7ee;--ink:#173c2c;--muted:#657369;--line:#dce0d3;--accent:#d8f36a;--white:#fff;--font:system-ui,-apple-system,"Segoe UI",sans-serif}
+@media (prefers-color-scheme:dark){:root{--paper:#10201a;--ink:#e8efe6;--muted:#9fb0a5;--line:#2a3d34;--white:#172b23}}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.45 var(--font)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.top{display:flex;justify-content:space-between;align-items:center;padding:14px 24px;border-bottom:1px solid var(--line)}
+.brand{display:flex;gap:10px;align-items:center;font-weight:800;font-size:19px}
+.status{font-size:13px;color:var(--muted)}.status.err{color:#c0392b}
+.layout{display:grid;grid-template-columns:1fr 340px;gap:24px;padding:20px 24px}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+h2{font-size:15px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 10px}
+.section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px}
+input,textarea,select,button{font:inherit;color:inherit;background:var(--white);border:1px solid var(--line);border-radius:8px;padding:7px 10px}
+button{background:var(--ink);color:var(--paper);border-color:var(--ink);cursor:pointer;font-weight:600}
+button.ghost{background:transparent;color:var(--ink);border-color:var(--line);font-weight:500;padding:3px 8px;font-size:12px}
+:focus-visible{outline:3px solid #738f26;outline-offset:2px}
+.inline-form{display:flex;gap:8px}.stack{display:grid;gap:8px;margin-bottom:12px}
+.board{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:12px;overflow-x:auto}
+.col{background:color-mix(in srgb,var(--line) 35%,transparent);border-radius:12px;padding:10px;min-height:200px}
+.col h3{font-size:12px;text-transform:uppercase;color:var(--muted);margin:0 0 8px;display:flex;justify-content:space-between}
+.card{background:var(--white);border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:8px}
+.card .t{font-weight:600}.card .m{font-size:12px;color:var(--muted);margin:4px 0 8px}
+.card .who{display:inline-block;background:var(--accent);color:#173c2c;border-radius:20px;padding:0 8px;font-size:12px;font-weight:600}
+.card .actions{display:flex;gap:4px;flex-wrap:wrap}
+.list{list-style:none;padding:0;margin:0 0 24px}.list li{border-bottom:1px solid var(--line);padding:8px 0}
+.list.small li{font-size:13px}.list .m{color:var(--muted);font-size:12px}
+.empty{color:var(--muted);font-size:13px}

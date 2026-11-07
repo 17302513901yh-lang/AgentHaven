@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentHaven</title>
+<link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<link rel="stylesheet" href="./app.css">
+<script defer src="./app.js"></script>
+</head>
+<body>
+<header class="top">
+  <div class="brand"><img src="./favicon.svg" alt="" width="28" height="28"> AgentHaven</div>
+  <span id="status" class="status" role="status" aria-live="polite">Connecting…</span>
+</header>
+<main class="layout">
+  <section aria-labelledby="board-h">
+    <div class="section-head">
+      <h2 id="board-h">Task board</h2>
+      <form id="new-task" class="inline-form">
+        <label class="sr" for="task-title">New task</label>
+        <input id="task-title" name="title" placeholder="New task…" required maxlength="200">
+        <button type="submit">Add</button>
+      </form>
+    </div>
+    <div id="board" class="board"></div>
+  </section>
+  <aside>
+    <section aria-labelledby="notes-h">
+      <h2 id="notes-h">Project memory</h2>
+      <form id="new-note" class="stack">
+        <label class="sr" for="note-title">Note title</label>
+        <input id="note-title" name="title" placeholder="Title" required maxlength="200">
+        <label class="sr" for="note-body">Note</label>
+        <textarea id="note-body" name="body" placeholder="Decision, convention, context…" required rows="3"></textarea>
+        <button type="submit">Save note</button>
+      </form>
+      <ul id="notes" class="list"></ul>
+    </section>
+    <section aria-labelledby="log-h">
+      <h2 id="log-h">Activity</h2>
+      <ul id="activity" class="list small"></ul>
+    </section>
+  </aside>
+</main>
+</body>
+</html>
