@@ -20,3 +20,4 @@
 ## Conventies
 - Actions gepind op commit-SHA met versiecommentaar; bij annotated tags de `^{}`-SHA nemen (`git ls-remote`).
 - Commits: conventional (`feat:`, `ci:`, `docs:`). README in het Nederlands, website in het Engels.
+- CI gebruikt nog `npm install` (lockfile niet gecommit: de MCP-pushtool is ongeschikt voor grote bestanden). Lockfile toevoegen en naar `npm ci` overstappen.
