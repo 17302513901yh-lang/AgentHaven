@@ -1,0 +1,100 @@
+{
+  "name": "agenthaven",
+  "version": "0.2.0",
+  "description": "One local shared workspace for all your AI agents: task board, project memory and handoffs, with an MCP agent plugin.",
+  "license": "MIT",
+  "author": "AgentHaven contributors",
+  "homepage": "https://laaielichter.github.io/AgentHaven/",
+  "repository": "github:laaielichter/AgentHaven",
+  "main": "desktop/main.js",
+  "bin": {
+    "agenthaven": "bin/agenthaven.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "ui"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test",
+    "lint": "node --check src/store.js && node --check src/mcp.js && node --check src/server.js && node --check src/connect.js && node --check bin/agenthaven.js && node --check desktop/main.js && node --check ui/app.js",
+    "serve": "node bin/agenthaven.js serve",
+    "mcp": "node bin/agenthaven.js mcp",
+    "app": "electron .",
+    "dist:win": "electron-builder --win --publish never",
+    "dist:mac": "electron-builder --mac --publish never"
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  },
+  "build": {
+    "appId": "io.github.laaielichter.agenthaven",
+    "productName": "AgentHaven",
+    "asar": false,
+    "files": [
+      "bin/**",
+      "src/**",
+      "ui/**",
+      "desktop/**",
+      "package.json"
+    ],
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "AgentHaven"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "universal"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "universal"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": false,
+      "icon": "build/icon.png"
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "laaielichter",
+        "repo": "AgentHaven"
+      }
+    ]
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
+  }
+}
