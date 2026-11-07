@@ -5,9 +5,9 @@ const status = document.querySelector('#demo-status');
 const play = document.querySelector('#handoff-demo');
 const reset = document.querySelector('#reset-demo');
 const details = {
-build: '<span class="detail-author"><span class="mini-avatar peach">B</span> Bouwer · voor de reviewer</span><blockquote>“De opzet staat klaar. Wil jij kijken of de taakstatussen duidelijk genoeg zijn?”</blockquote><div class="context-file"><span aria-hidden="true">≡</span> werkbord-opzet.md <span aria-hidden="true">↗</span></div>',
-review: '<span class="detail-author"><span class="mini-avatar lime">R</span> Reviewer · voor de bouwer</span><blockquote>“Ik kijk naar de duidelijkheid van de taken. De afspraken van de planner neem ik mee in mijn review.”</blockquote><div class="context-file"><span aria-hidden="true">≡</span> review-notities.md <span aria-hidden="true">↗</span></div>',
-plan: '<span class="detail-author"><span class="mini-avatar lilac">P</span> Planner · voor het team</span><blockquote>“Begin klein: één project, drie taakstatussen en een plek voor uitleg. De bouwer kan hiermee aan de slag.”</blockquote><div class="context-file"><span aria-hidden="true">≡</span> projectafspraken.md <span aria-hidden="true">↗</span></div>'
+build: '<span class="detail-author"><span class="mini-avatar peach">B</span> Builder · for the reviewer</span><blockquote>“The draft is ready. Could you check whether the task statuses are clear enough?”</blockquote><div class="context-file"><span aria-hidden="true">≡</span> board-draft.md <span aria-hidden="true">↗</span></div>',
+review: '<span class="detail-author"><span class="mini-avatar lime">R</span> Reviewer · for the builder</span><blockquote>“I’m checking how clear the tasks are, using the planner’s notes to guide my review.”</blockquote><div class="context-file"><span aria-hidden="true">≡</span> review-notes.md <span aria-hidden="true">↗</span></div>',
+plan: '<span class="detail-author"><span class="mini-avatar lilac">P</span> Planner · for the team</span><blockquote>“Start small: one project, three task statuses, and a place for context. The builder can take it from here.”</blockquote><div class="context-file"><span aria-hidden="true">≡</span> project-agreements.md <span aria-hidden="true">↗</span></div>'
 };
 function selectTask(name) {
   cards.forEach(card => {
@@ -23,23 +23,23 @@ let stage = 0;
 play.addEventListener('click', () => {
   if (stage === 0) {
     stage = 1; play.disabled = true; selectTask('build');
-    status.innerHTML = '<span class="status-dot"></span> Bouwer legt de context klaar…';
+    status.innerHTML = '<span class="status-dot"></span> Builder is preparing the context…';
     timer = window.setTimeout(() => {
       document.querySelector('#done-slot').append(document.querySelector('[data-task="build"]'));
       document.querySelector('#doing-slot').append(document.querySelector('[data-task="review"]'));
       document.querySelector('#todo-count').textContent = '0';
       document.querySelector('#done-count').textContent = '2';
       selectTask('review');
-      status.innerHTML = '<span class="status-dot"></span> Reviewer gaat verder met de gedeelde context.';
-      play.innerHTML = 'Rond de review af <span aria-hidden="true">→</span>';
+      status.innerHTML = '<span class="status-dot"></span> Reviewer picks up with the shared context.';
+      play.innerHTML = 'Complete the review <span aria-hidden="true">→</span>';
       play.disabled = false; reset.hidden = false;
     }, 1100);
   } else {
     document.querySelector('#done-slot').append(document.querySelector('[data-task="review"]'));
     document.querySelector('#doing-count').textContent = '0';
     document.querySelector('#done-count').textContent = '3';
-    status.innerHTML = '<span class="status-dot"></span> Samen afgerond. De kennis blijft bij het project.';
-    detail.innerHTML = '<span class="detail-author"><span class="mini-avatar lime">R</span> Reviewer · voor het team</span><blockquote>“De aanpak is helder. Mijn opmerkingen staan bij het project, zodat we de volgende keer kunnen verderbouwen.”</blockquote><div class="context-file"><span aria-hidden="true">≡</span> review-afgerond.md <span aria-hidden="true">↗</span></div>';
+    status.innerHTML = '<span class="status-dot"></span> Done together. The knowledge stays with the project.';
+    detail.innerHTML = '<span class="detail-author"><span class="mini-avatar lime">R</span> Reviewer · for the team</span><blockquote>“The approach is clear. My notes stay with the project, ready for us to build on next time.”</blockquote><div class="context-file"><span aria-hidden="true">≡</span> review-complete.md <span aria-hidden="true">↗</span></div>';
     play.hidden = true; stage = 2;
   }
 });
@@ -50,7 +50,7 @@ reset.addEventListener('click', () => {
   document.querySelector('#todo-count').textContent = '1';
   document.querySelector('#doing-count').textContent = '1';
   document.querySelector('#done-count').textContent = '1';
-  status.innerHTML = '<span class="status-dot"></span> Klaar voor een overdracht.';
-  play.innerHTML = 'Speel overdracht af <span aria-hidden="true">→</span>';
+  status.innerHTML = '<span class="status-dot"></span> Ready for a handoff.';
+  play.innerHTML = 'Play a handoff <span aria-hidden="true">→</span>';
   play.hidden = false; play.disabled = false; reset.hidden = true; selectTask('build'); play.focus();
 });
