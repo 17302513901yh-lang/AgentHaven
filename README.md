@@ -2,6 +2,8 @@
 
 **Alle AI's. Eén gedeelde werkplek.**
 
+[Bezoek de website en probeer de conceptdemo](https://laaielichter.github.io/AgentHaven/).
+
 AgentHaven wordt een lokale werkplek waar mensen en verschillende AI-agents samen aan projecten werken. Een gedeeld werkbord en projectgeheugen maken zichtbaar wat er moet gebeuren, wie ermee bezig is en welke kennis een volgende agent nodig heeft.
 
 ## Status
