@@ -60,6 +60,11 @@ jobs:
             ~/AppData/Local/electron-builder/Cache
           key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
           restore-keys: electron-${{ runner.os }}-
+      # Download and verify Electron for this platform against GitHub's SHASUMS256.txt, with
+      # patient retries, into the cache electron-builder reads. The build then needs no network.
+      - name: Prefetch Electron
+        shell: bash
+        run: node scripts/prefetch-electron.js ${{ matrix.name == 'windows' && 'win' || 'mac' }}
       # Signing is enabled automatically when the secrets below are set;
       # without them the build is unsigned (fine for testing, not for users).
       - name: Build installer
@@ -77,7 +82,9 @@ jobs:
           # electron-builder downloads its tools (NSIS, dmg-builder) while it builds; a 5xx from that
           # mirror once blocked a release. Retry twice; a real build error fails all three tries.
           for try in 1 2 3; do
-            npm run ${{ matrix.script }} -- $extra && break
+            # The prefetch step already verified the zips against SHASUMS256.txt, so skip the
+            # second check: it would download SHASUMS256.txt again and could hit the same outage.
+            npm run ${{ matrix.script }} -- $extra -c.electronDownload.isVerifyChecksum=false && break
             if [ "$try" = 3 ]; then exit 1; fi
             echo "Build attempt $try failed; retrying in $((try * 45)) s"; sleep $((try * 45))
           done
