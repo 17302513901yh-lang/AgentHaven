@@ -25,6 +25,9 @@ Usage:
   agenthaven sync         [--watch] [--workspace name]       apply WORKBOARD.md Inbox commands and rewrite the board
   agenthaven instructions [--workspace name]                 text to paste into AGENTS.md, CLAUDE.md, GEMINI.md, ...
   agenthaven board        [--workspace name]                 print the board as Markdown
+  agenthaven repo <path> [--base main]                       human: the git repository this board works on
+  agenthaven checks "<command>" ["<command>" ...]            human: the checks AgentHaven runs before approval
+  agenthaven radar                                           files changed on more than one active branch
   agenthaven dream        [--workspace name]                 look back at past mistakes now and propose lessons
   agenthaven dream --prompt                                  print the instructions for a Claude (or other LLM) dreaming agent
 
@@ -88,6 +91,21 @@ switch (cmd) {
     break;
   case 'board':
     console.log(require('../src/workboard').renderBoard(store()));
+    break;
+  case 'repo': {
+    const r = require('../src/git').setRepo(store(), { actor: 'you', dir: path.resolve(positional[0] || fail('usage: agenthaven repo <path>')), base: flag('base') });
+    console.log(`Repository: ${r.path} (base ${r.base})`);
+    break;
+  }
+  case 'checks': {
+    const list = positional.map((command, i) => ({ name: positional.length > 1 ? `check ${i + 1}` : 'checks', command }));
+    const r = require('../src/checks').setChecks(store(), { actor: 'you', checks: list });
+    console.log(r.checks.length ? r.checks.map((c) => `- ${c.name}: ${c.command}`).join('\n') : 'No checks.');
+    break;
+  }
+  case 'radar': console.log(JSON.stringify(require('../src/git').radar(store()), null, 2)); break;
+  case 'run-checks': // started by AgentHaven itself in the background
+    require('../src/checks').runReceipt(store(), positional[0], positional[1]).catch((err) => fail(err.message));
     break;
   case 'dream': {
     const dreams = require('../src/dream');

@@ -14,14 +14,15 @@ const tmpStore = (opts = {}) => new Store({ dataDir: tmpDir(), ...opts });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 test('leases: a quiet agent loses its claim, a heartbeat keeps it', async () => {
-  const s = tmpStore({ leaseMs: 60 });
+  // Wide margins: Windows CI spends hundreds of ms on file locks and renames alone.
+  const s = tmpStore({ leaseMs: 2000 });
   const a = s.createTask({ title: 'A', files: ['src/a.js'], actor: 'x' });
   const b = s.createTask({ title: 'B', actor: 'x' });
   s.claimTask(a.id, { actor: 'claude' });
   s.claimTask(b.id, { actor: 'codex' });
-  await sleep(40);
-  s.heartbeat({ actor: 'codex' });
-  await sleep(40);
+  await sleep(1200); // both leases still valid (2000 ms)
+  s.heartbeat({ actor: 'codex' }); // codex now runs until ~3200 ms
+  await sleep(1200); // claude's lease ended at ~2000 ms; codex has ~800 ms to spare
   const after = s.getTask(a.id);
   assert.equal(after.status, 'todo');
   assert.equal(after.assignee, null);
@@ -302,7 +303,9 @@ test('workboard: backslashes and pipes in text cannot break the tables', () => {
 
 test('dreaming: past mistakes become lessons that reach the next agent', async () => {
   const dreams = require('../src/dream');
-  const s = tmpStore({ leaseMs: 30 });
+  const s = tmpStore();
+  // Only the renderer task gets a short lease, so slow machines cannot expire the other claims.
+  const fast = new Store({ dataDir: s.dataDir, leaseMs: 30 });
   // Two reviews in src/api sent back for the same reason.
   for (const n of [1, 2]) {
     const t = s.createTask({ title: `Endpoint ${n}`, files: [`src/api/e${n}.js`], review: true, actor: 'roel' });
@@ -312,10 +315,10 @@ test('dreaming: past mistakes become lessons that reach the next agent', async (
   }
   // A task whose claims keep expiring.
   const big = s.createTask({ title: 'Rewrite the renderer', actor: 'roel' });
-  s.claimTask(big.id, { actor: 'gemini' });
-  await sleep(50);
-  s.claimTask(big.id, { actor: 'gemini' });
-  await sleep(50);
+  fast.claimTask(big.id, { actor: 'gemini' });
+  await sleep(80);
+  fast.claimTask(big.id, { actor: 'gemini' });
+  await sleep(80);
   s.listTasks();
   // Two notes that say the same thing.
   s.addNote({ title: 'Paths', body: 'Always store paths with forward slashes in the store', actor: 'a' });
@@ -324,8 +327,8 @@ test('dreaming: past mistakes become lessons that reach the next agent', async (
   const d = dreams.dream(s);
   const kinds = [...new Set(d.proposals.map((p) => p.kind))].sort();
   assert.deepEqual(kinds, ['agent-tip', 'lesson', 'merge-notes', 'task']);
-  // With a 30 ms lease, both gemini (renderer) and codex (sent-back work) went quiet twice.
-  assert.deepEqual(d.proposals.filter((p) => p.kind === 'agent-tip').map((p) => p.agent).sort(), ['codex', 'gemini']);
+  // gemini went quiet twice on the renderer.
+  assert.deepEqual(d.proposals.filter((p) => p.kind === 'agent-tip').map((p) => p.agent), ['gemini']);
   const lesson = d.proposals.find((p) => p.kind === 'lesson');
   assert.match(lesson.title, /src\/api was sent back 2 times/);
   assert.match(lesson.body, /missing input validation tests/);

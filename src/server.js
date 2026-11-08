@@ -11,6 +11,8 @@ const path = require('node:path');
 const { Store, defaultDataDir } = require('./store');
 const workboard = require('./workboard');
 const dreams = require('./dream');
+const checks = require('./checks');
+const gitx = require('./git');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
@@ -57,6 +59,9 @@ function createServer({ store, dataDir, human = 'you', onError = () => {}, dream
     ['PATCH', /^\/api\/tasks\/([\w-]+)$/, (q, b, a, id) => a.s.updateTask(id, { ...b, actor: a.actor })],
     ['DELETE', /^\/api\/tasks\/([\w-]+)$/, (q, b, a, id) => a.s.deleteTask(id, { version: q.has('version') ? Number(q.get('version')) : undefined, actor: a.actor })],
     ['POST', /^\/api\/tasks\/([\w-]+)\/claim$/, (q, b, a, id) => lessons(a.s, a.s.claimTask(id, { actor: a.actor }), a.actor)],
+    ['GET', /^\/api\/guard$/, (q, b, a) => a.s.guardLog({ limit: Number(q.get('limit')) || 50 })],
+    ['POST', /^\/api\/notes\/([\w-]+)\/release$/, (q, b, a, id) => a.s.releaseNote(id, { actor: a.actor })],
+    ['POST', /^\/api\/notes\/([\w-]+)\/remove$/, (q, b, a, id) => a.s.releaseNote(id, { actor: a.actor, remove: true })],
     ['GET', /^\/api\/inbox$/, (q, b, a) => a.s.inbox({ actor: a.actor, markRead: q.get('markRead') !== 'false' })],
     ['POST', /^\/api\/messages$/, (q, b, a) => a.s.sendMessage({ ...b, actor: a.actor })],
     ['GET', /^\/api\/tasks\/([\w-]+)\/context$/, (q, b, a, id) => { const c = a.s.getContext(id, { actor: a.actor }); return { ...c, lessons: dreams.lessonsFor(a.s, c.task, { agent: a.actor }) }; }],
@@ -78,7 +83,14 @@ function createServer({ store, dataDir, human = 'you', onError = () => {}, dream
     ['POST', /^\/api\/tasks\/([\w-]+)\/handoff$/, (q, b, a, id) => a.s.handoff(id, { ...b, actor: a.actor })],
     ['POST', /^\/api\/tasks\/([\w-]+)\/progress$/, (q, b, a, id) => a.s.reportProgress(id, { ...b, actor: a.actor })],
     ['POST', /^\/api\/tasks\/([\w-]+)\/criteria$/, (q, b, a, id) => a.s.setCriterion(id, { ...b, criterion: String(b.criterion), actor: a.actor })],
-    ['POST', /^\/api\/tasks\/([\w-]+)\/submit$/, (q, b, a, id) => a.s.submitForReview(id, { ...b, actor: a.actor })],
+    ['POST', /^\/api\/tasks\/([\w-]+)\/submit$/, (q, b, a, id) => checks.submit(a.s, id, { ...b, actor: a.actor })],
+    ['POST', /^\/api\/tasks\/([\w-]+)\/worktree$/, (q, b, a, id) => gitx.createWorktree(a.s, id, { actor: a.actor })],
+    ['POST', /^\/api\/tasks\/([\w-]+)\/scope$/, (q, b, a, id) => gitx.checkScope(a.s, id, { actor: a.actor, dir: b.dir })],
+    ['POST', /^\/api\/tasks\/([\w-]+)\/checks$/, (q, b, a, id) => checks.startChecks(a.s, id, { actor: a.actor })],
+    ['GET', /^\/api\/radar$/, (q, b, a) => gitx.radar(a.s)],
+    ['GET', /^\/api\/code$/, (q, b, a) => ({ repo: a.s.getSettings().repo || null, ...checks.settingsOf(a.s) })],
+    ['PUT', /^\/api\/code\/repo$/, (q, b, a) => gitx.setRepo(a.s, { ...b, actor: a.actor })],
+    ['PUT', /^\/api\/code\/checks$/, (q, b, a) => checks.setChecks(a.s, { ...b, actor: a.actor })],
     ['POST', /^\/api\/tasks\/([\w-]+)\/review$/, (q, b, a, id) => a.s.reviewTask(id, { ...b, actor: a.actor })],
     ['POST', /^\/api\/tasks\/([\w-]+)\/comments$/, (q, b, a, id) => a.s.comment(id, { ...b, actor: a.actor })],
     ['GET', /^\/api\/notes$/, (q, b, a) => a.s.listNotes({ query: q.get('q') || undefined })],

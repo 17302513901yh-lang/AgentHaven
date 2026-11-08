@@ -14,6 +14,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { STATUSES } = require('./store');
 const dreams = require('./dream');
+const { inspect } = require('./guard');
+const checks = require('./checks');
+const gitx = require('./git');
 const pkg = require('../package.json');
 
 const BOARD = 'WORKBOARD.md';
@@ -45,6 +48,10 @@ const COMMANDS = [
   ['block <task> <reason>', 'mark your task blocked'],
   ['comment <task> <text>', 'ask or answer a question on a task'],
   ['inbox', 'what needs you: messages, questions, reviews, escalations'],
+  ['worktree <task>', 'get your own git worktree and branch for the task'],
+  ['scope <task>', 'check that you only changed files your task claims'],
+  ['checks <task>', 'let AgentHaven run the tests on your commit (approval needs a pass)'],
+  ['radar', 'files changed on more than one active branch (future merge conflicts)'],
   ['ask <task> [@agent|@humans] <question>', 'ask instead of guessing; your task waits for the answer'],
   ['answer <task> <answer>', 'answer the latest open question on a task'],
   ['msg <@agent|@humans|@everyone|@skill:x> <text>', 'tell others what they need to know'],
@@ -320,8 +327,8 @@ function applyCommand(store, raw) {
         const t = store.getTask(id);
         if (t.review && t.assignee === actor && t.status !== 'review') {
           const [summary, verification] = splitVerified(after);
-          const r = store.submitForReview(id, { actor, summary: summary || 'done', verification });
-          return { ok: true, message: `sent to review${r.reviewer ? ` (reviewer: ${r.reviewer})` : ''}: another agent or a human approves it` };
+          const r = checks.submit(store, id, { actor, summary: summary || 'done', verification });
+          return { ok: true, message: `sent to review${r.reviewer ? ` (reviewer: ${r.reviewer})` : ''}${r.receipt ? `; checks running on ${r.receipt.sha.slice(0, 10)}` : ''}${r.scope && !r.scope.ok ? '; ⚠ scope warning, see inbox' : ''}` };
         }
         store.updateTask(id, { version: t.version, status: 'done', actor });
         if (after) store.comment(id, { actor, body: `Done: ${after}` });
@@ -329,8 +336,8 @@ function applyCommand(store, raw) {
       }
       case 'review': {
         const [summary, verification] = splitVerified(after);
-        const r = store.submitForReview(task(), { actor, summary: summary || 'ready', verification });
-        return { ok: true, message: `waiting for review${r.reviewer ? ` by ${r.reviewer}` : ''}` };
+        const r = checks.submit(store, task(), { actor, summary: summary || 'ready', verification });
+        return { ok: true, message: `waiting for review${r.reviewer ? ` by ${r.reviewer}` : ''}${r.receipt ? `; checks running on ${r.receipt.sha.slice(0, 10)}` : ''}${r.scope && !r.scope.ok ? '; ⚠ scope warning, see inbox' : ''}` };
       }
       case 'approve': { const t = store.reviewTask(task(), { actor, approve: true, comment: after || undefined }); return { ok: true, message: `approved "${t.title}"` }; }
       case 'reject': { const t = store.reviewTask(task(), { actor, approve: false, comment: after }); return { ok: true, message: `sent back to ${t.assignee}` }; }
@@ -387,6 +394,16 @@ function applyCommand(store, raw) {
         return { ok: true, message: 'goal set' };
       }
       case 'resolve': { store.resolveEscalation(task(), { actor, note: after }); return { ok: true, message: 'escalation resolved' }; }
+      case 'worktree': { const w = gitx.createWorktree(store, task(), { actor }); return { ok: true, message: `work in ${w.path} on branch ${w.branch}` }; }
+      case 'scope': {
+        const r = gitx.checkScope(store, task(), { actor });
+        return { ok: r.ok, message: r.ok ? `${r.changed.length} changed file(s), all inside the task` : `outside the task: ${r.outOfScope.join(', ') || '—'}; held by others: ${r.foreign.map((f) => `${f.files.join(', ')} (${f.agent})`).join('; ') || '—'}` };
+      }
+      case 'checks': { const r = checks.startChecks(store, task(), { actor }); return { ok: true, message: `checks running on ${r.sha.slice(0, 10)}; the result comes to your inbox` }; }
+      case 'radar': {
+        const r = gitx.radar(store);
+        return { ok: !r.conflicts.length, message: r.conflicts.length ? r.conflicts.map((c) => `${c.files.join(', ')}: ${c.a.agent} (${c.a.id}) and ${c.b.agent} (${c.b.id})`).join('; ') : r.advice };
+      }
       case 'note': {
         const [title, ...body] = rest.split('|');
         store.addNote({ title: title.trim(), body: body.join('|').trim() || title.trim(), actor });
@@ -435,7 +452,8 @@ function syncOnce(store, dir) {
   const before = readOr(file);
   const lines = before ? inboxLines(before) : [];
   const results = [];
-  for (const l of lines) results.push({ line: l, at: new Date().toISOString(), ...applyCommand(store, l) });
+  // The command line is echoed back under "Inbox results": never echo a secret.
+  for (const l of lines) results.push({ line: inspect(l).text, at: new Date().toISOString(), ...applyCommand(store, l) });
   const settings = store.getSettings();
   const kept = [...results.reverse(), ...(settings.workboardResults || [])].slice(0, MAX_RESULTS);
   if (results.length) store.setSettings({ workboardResults: kept }, 'agenthaven');
