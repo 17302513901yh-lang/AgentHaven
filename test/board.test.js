@@ -288,3 +288,14 @@ test('connect: Gemini CLI (JSON) and Codex (TOML) keep their other settings', ()
   connect.install('gemini', entry, opts);
   assert.ok(JSON.parse(fs.readFileSync(connect.clients(opts).gemini.file, 'utf8')).mcpServers.agenthaven);
 });
+
+test('workboard: backslashes and pipes in text cannot break the tables', () => {
+  const s = tmpStore();
+  s.createTask({ title: 'C:\\path\\ | weird \\| title', actor: 'x' });
+  const t = s.listTasks()[0];
+  s.claimTask(t.id, { actor: 'codex' });
+  const md = wb.renderBoard(s);
+  const row = md.split('\n').find((l) => l.includes(t.id) && l.startsWith('|'));
+  assert.ok(row.includes('C:\\\\path\\\\ \\| weird \\\\\\| title'), row);
+  assert.equal(row.split(/(?<!\\)\|/).length - 2, 7, 'still seven columns');
+});

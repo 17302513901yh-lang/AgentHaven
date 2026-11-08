@@ -22,7 +22,8 @@ const INBOX_HELP = '<!-- One command per line below, as "yourname: command". Age
 const MAX_RESULTS = 40;
 const AGENT_RE = /^[\w.@-]{1,100}$/;
 
-const cell = (s) => String(s ?? '').replace(/\r?\n/g, ' ').replace(/\|/g, '\\|').trim();
+// Markdown table cell: one line, with backslashes and pipes escaped.
+const cell = (s) => String(s ?? '').replace(/\r?\n/g, ' ').replace(/\\/g, '\\\\').replace(/\|/g, '\\|').trim();
 const short = (iso) => (iso ? iso.replace(/:\d\d\.\d+Z$/, 'Z').replace('T', ' ') : '');
 const money = (n) => `$${(n || 0).toFixed(2)}`;
 const kTokens = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${Math.round(n / 1e3)}k` : String(n || 0));
@@ -310,10 +311,10 @@ function appendLogbook(store, dir) {
   const file = path.join(dir, LOGBOOK);
   const settings = store.getSettings();
   let since = settings.logbookSeq || 0;
-  if (!fs.existsSync(file)) {
-    fs.writeFileSync(file, `# Logbook — ${store.workspace}\n\nAppend-only record of the shared board, written by AgentHaven. Newest at the bottom.\n\n`);
+  try { // create it only when missing ("wx" fails if it exists), then start from the beginning
+    fs.writeFileSync(file, `# Logbook — ${store.workspace}\n\nAppend-only record of the shared board, written by AgentHaven. Newest at the bottom.\n\n`, { flag: 'wx' });
     since = 0;
-  }
+  } catch (err) { if (err.code !== 'EEXIST') throw err; }
   const { events, latest } = store.events({ since, limit: 500 });
   if (!events.length) return 0;
   const text = events.map((e) => {

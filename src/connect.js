@@ -31,9 +31,14 @@ function tomlBlock(entry) {
   return `${lines.join('\n')}\n`;
 }
 
+function readIfExists(file) {
+  try { return fs.readFileSync(file, 'utf8'); } catch (err) { if (err.code === 'ENOENT') return null; throw err; }
+}
+
 function installToml(client, entry) {
-  let text = fs.existsSync(client.file) ? fs.readFileSync(client.file, 'utf8') : '';
-  if (text) fs.copyFileSync(client.file, `${client.file}.agenthaven-backup`);
+  let text = readIfExists(client.file) || '';
+  // The backup is the exact text we read, so it always matches what we change.
+  if (text) fs.writeFileSync(`${client.file}.agenthaven-backup`, text);
   const block = tomlBlock(entry);
   const re = /^\[mcp_servers\.agenthaven\][^\n]*\n(?:(?!\[)[^\n]*\n?)*/m;
   text = re.test(text) ? text.replace(re, `${block}\n`) : `${text}${text && !text.endsWith('\n') ? '\n' : ''}${text ? '\n' : ''}${block}`;
@@ -47,12 +52,12 @@ function install(clientId, entry, opts = {}) {
   if (!client) throw new Error(`unknown client ${clientId}`);
   if (client.format === 'toml') return installToml(client, entry);
   let config = {};
-  if (fs.existsSync(client.file)) {
-    const raw = fs.readFileSync(client.file, 'utf8');
+  const raw = readIfExists(client.file);
+  if (raw !== null) {
     try { config = raw.trim() ? JSON.parse(raw) : {}; } catch {
       throw new Error(`${client.file} is not valid JSON; fix it first, AgentHaven will not overwrite it`);
     }
-    fs.copyFileSync(client.file, `${client.file}.agenthaven-backup`);
+    fs.writeFileSync(`${client.file}.agenthaven-backup`, raw);
   }
   config.mcpServers = { ...(config.mcpServers || {}), agenthaven: entry };
   fs.mkdirSync(path.dirname(client.file), { recursive: true });
