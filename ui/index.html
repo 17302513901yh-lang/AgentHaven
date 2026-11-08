@@ -20,6 +20,7 @@
   </div>
 </header>
 
+<div id="goal-bar" class="goal-bar" hidden></div>
 <main class="layout">
   <section aria-labelledby="board-h" class="main">
     <div class="toolbar">
@@ -52,6 +53,27 @@
   </section>
 
   <aside>
+    <section aria-labelledby="inbox-h" class="inbox">
+      <div class="row"><h2 id="inbox-h" class="grow">Your inbox</h2><span id="inbox-count" class="chip" hidden></span></div>
+      <ul id="inbox" class="list"></ul>
+    </section>
+    <section aria-labelledby="team-h">
+      <h2 id="team-h">Team</h2>
+      <div class="stack">
+        <label class="check"><input type="checkbox" id="mode-agents"> Agents-only mode: no human needed; an agent can take the lead</label>
+        <label class="row">Lead <select id="lead" class="grow"></select></label>
+        <details id="goal-edit">
+          <summary>Goal and definition of done</summary>
+          <form id="goal-form" class="stack">
+            <label class="sr" for="goal-text">Goal</label>
+            <textarea id="goal-text" rows="2" placeholder="What this board is for"></textarea>
+            <label class="sr" for="goal-done">Done when</label>
+            <input id="goal-done" placeholder="Done when… (e.g. all tests pass and v1 is released)">
+            <button type="submit">Save goal</button>
+          </form>
+        </details>
+      </div>
+    </section>
     <section aria-labelledby="agents-h">
       <h2 id="agents-h">Agents</h2>
       <ul id="agents" class="list agents"></ul>
@@ -107,6 +129,7 @@
     </div>
     <div id="dlg-banner" class="banner" hidden></div>
     <div id="dlg-lessons" class="lessons" hidden></div>
+    <div id="dlg-escalated" class="banner bad" hidden><span id="dlg-escalated-text"></span> <button type="button" id="dlg-resolve" class="ghost">Resolve</button></div>
     <div class="tabs" role="tablist">
       <button type="button" role="tab" data-tab="details" aria-selected="true">Details</button>
       <button type="button" role="tab" data-tab="criteria">Criteria <span id="tab-criteria-n"></span></button>
@@ -127,6 +150,9 @@
         <label>Budget (tokens) <input name="budgetTokens" type="number" min="0" step="1000" placeholder="none"></label>
         <label class="check span2"><input type="checkbox" name="review"> Needs review by someone else before it is done</label>
         <fieldset class="span2"><legend>Starts after</legend><div id="dlg-deps" class="deps"></div></fieldset>
+        <fieldset class="span2" id="dlg-sub-wrap"><legend>Subtasks</legend><ul id="dlg-subtasks" class="subtasks"></ul>
+          <div class="row"><input id="split-parts" class="grow" placeholder="Split into: part one; part two; part three"><label class="check"><input type="checkbox" id="split-seq"> in order</label><button type="button" id="split-go" class="ghost">Split</button></div>
+        </fieldset>
       </div>
     </div>
     <div class="tab" data-panel="criteria" hidden>
@@ -135,8 +161,10 @@
       <p class="m">Criteria are saved with the task. All must be checked before the task can be done.</p>
     </div>
     <div class="tab" data-panel="comments" hidden>
+      <ul id="dlg-questions" class="thread"></ul>
       <ul id="dlg-comments" class="thread"></ul>
-      <div class="row"><textarea id="comment-new" rows="2" class="grow" placeholder="Ask or answer the agent on this task"></textarea><button type="button" id="comment-add">Send</button></div>
+      <div class="row"><textarea id="comment-new" rows="2" class="grow" placeholder="Comment (use @name to reach an agent)"></textarea>
+        <div class="stack"><button type="button" id="comment-add">Comment</button><button type="button" id="question-add" class="ghost" title="The agent holding the task waits for the answer">Ask question</button></div></div>
     </div>
     <div class="tab" data-panel="metrics" hidden>
       <div id="dlg-progress"></div>

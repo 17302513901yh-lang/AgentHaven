@@ -74,12 +74,12 @@ test('review: criteria and a second pair of eyes gate "done"', () => {
   cur = s.getTask(t.id);
   assert.throws(() => s.updateTask(t.id, { version: cur.version, status: 'done', actor: 'codex' }), /review/);
   assert.throws(() => s.updateTask(t.id, { version: cur.version, status: 'done', actor: 'gemini' }), /codex holds this task/);
-  s.submitForReview(t.id, { actor: 'codex', summary: 'done, tests green' });
+  s.submitForReview(t.id, { actor: 'codex', summary: 'done', verification: 'npm test: 12 passed' });
   assert.throws(() => s.reviewTask(t.id, { actor: 'codex', approve: true }), /own work/);
   assert.throws(() => s.reviewTask(t.id, { actor: 'claude', approve: false }), /comment/);
   const back = s.reviewTask(t.id, { actor: 'claude', approve: false, comment: 'add an edge case' });
   assert.equal(back.status, 'doing');
-  s.submitForReview(t.id, { actor: 'codex', summary: 'edge case added' });
+  s.submitForReview(t.id, { actor: 'codex', summary: 'edge case added', verification: 'npm test: 13 passed' });
   const ok = s.reviewTask(t.id, { actor: 'claude', approve: true, comment: 'lgtm' });
   assert.equal(ok.status, 'done');
   assert.equal(ok.reviewedBy, 'claude');
@@ -159,7 +159,7 @@ test('workboard: agents of any vendor collaborate by editing WORKBOARD.md', () =
   assert.equal(task.criteria.length, 2);
   const short = task.id.slice(5, 10);
   add(`gemini: next`, `codex: claim ${short}`, `gemini: progress ${short} 40% halfway | tokens=1000 cost=0.02 tests=12`,
-    `gemini: check ${short} 1`, `gemini: check ${short} 2`, `gemini: done ${short} retry with backoff`, `gemini: approve ${short}`, `codex: approve ${short} nice`);
+    `gemini: check ${short} 1`, `gemini: check ${short} 2`, `gemini: done ${short} retry with backoff | verified: npm test, 31 passed`, `gemini: approve ${short}`, `codex: approve ${short} nice`);
   r = wb.syncOnce(s, dir);
   assert.deepEqual(r.results.map((x) => x.ok), [true, false, true, true, true, true, false, true]);
   assert.match(r.results[1].message, /claimed by gemini/);
@@ -212,7 +212,7 @@ test('MCP: vendor detection, next_task, progress and review tools', () => {
   assert.equal(picked.task.id, t.id);
   assert.equal(call(codex, 'report_progress', { id: t.id, progress: 80, metrics: { tests: 41 } }).progress, 80);
   call(codex, 'check_criterion', { id: t.id, criterion: 1, done: true });
-  call(codex, 'submit_for_review', { id: t.id, summary: 'all green' });
+  call(codex, 'submit_for_review', { id: t.id, summary: 'all green', verification: 'pytest: 41 passed' });
   assert.match(call(codex, 'review_task', { id: t.id, approve: true }).error, /own work/);
   assert.equal(call(claude, 'review_task', { id: t.id, approve: true }).status, 'done');
   const ev = call(claude, 'events', { since: 0 });
@@ -307,7 +307,7 @@ test('dreaming: past mistakes become lessons that reach the next agent', async (
   for (const n of [1, 2]) {
     const t = s.createTask({ title: `Endpoint ${n}`, files: [`src/api/e${n}.js`], review: true, actor: 'roel' });
     s.claimTask(t.id, { actor: 'codex' });
-    s.submitForReview(t.id, { actor: 'codex', summary: 'done' });
+    s.submitForReview(t.id, { actor: 'codex', summary: 'done', verification: 'ran the endpoint tests' });
     s.reviewTask(t.id, { actor: 'claude', approve: false, comment: 'missing input validation tests' });
   }
   // A task whose claims keep expiring.
@@ -398,4 +398,151 @@ test('HTTP: dream now, review proposals, settings', async () => {
   } finally {
     server.close();
   }
+});
+
+test('collaboration without humans: three vendors finish a goal on their own', () => {
+  const s = tmpStore();
+  const mcp = (agent, client) => {
+    const h = createHandler({ store: s, agent });
+    h({ jsonrpc: '2.0', id: 0, method: 'initialize', params: { clientInfo: { name: client } } });
+    return (name, args = {}) => {
+      const res = h({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }).result;
+      return res.isError ? { error: res.content[0].text } : JSON.parse(res.content[0].text);
+    };
+  };
+  const claude = mcp('claude', 'claude-code');
+  const codex = mcp('codex', 'codex-mcp-client');
+  const gemini = mcp('gemini', 'gemini-cli');
+  gemini('register_agent', { skills: ['review', 'docs'] });
+  codex('register_agent', { skills: ['python', 'review'] });
+
+  // No human ever: agents-only is on by itself, and an agent can take the lead.
+  assert.equal(claude('board_summary').agentsOnly, true);
+  assert.equal(claude('take_lead').lead, 'claude');
+  assert.match(codex('take_lead').error, /claude is the lead and online/);
+  claude('set_goal', { text: 'Ship the CSV importer', doneWhen: 'import works and is reviewed' });
+  assert.match(codex('inbox').messages.map((m) => m.body).join(' '), /New goal: Ship the CSV importer/);
+
+  // The lead splits the work; subtasks run in order.
+  const epic = claude('create_task', { title: 'CSV importer', review: false });
+  const split = claude('split_task', { id: epic.id, sequential: true, parts: [{ title: 'Parser', skills: ['python'] }, { title: 'Docs', skills: ['docs'] }] });
+  const [parser, docs] = split.subtasks;
+  assert.deepEqual(docs.dependsOn, [parser.id]);
+
+  // codex is unsure and asks instead of guessing; its task waits for the answer.
+  assert.equal(codex('next_task', { claim: true }).task.id, parser.id);
+  codex('ask_question', { id: parser.id, to: 'claude', question: 'Semicolons or commas?' });
+  assert.equal(codex('get_task', { id: parser.id }).status, 'blocked');
+  const q = claude('inbox').questions;
+  assert.equal(q[0].text, 'Semicolons or commas?');
+  claude('answer_question', { id: parser.id, answer: 'Both, detect it from the header' });
+  assert.equal(codex('get_task', { id: parser.id }).status, 'doing');
+  assert.equal(codex('inbox').answers[0].answer, 'Both, detect it from the header');
+
+  // Verification is required; a reviewer with the "review" skill is picked, not the author.
+  assert.match(codex('submit_for_review', { id: parser.id, summary: 'done' }).error, /verification/);
+  const submitted = codex('submit_for_review', { id: parser.id, summary: 'parser done', verification: 'pytest tests/test_csv.py: 14 passed' });
+  assert.equal(submitted.reviewer, 'gemini');
+  assert.equal(gemini('inbox').reviews[0].id, parser.id);
+  assert.equal(gemini('review_task', { id: parser.id, approve: true }).status, 'done');
+
+  // The parent cannot close before its subtasks; context carries what the parser delivered.
+  assert.match(claude('update_task', { id: epic.id, version: claude('get_task', { id: epic.id }).version, status: 'done' }).error, /subtask/);
+  const ctx = gemini('get_context', { id: docs.id });
+  assert.equal(ctx.dependencies[0].verification, 'pytest tests/test_csv.py: 14 passed');
+  assert.equal(ctx.parent.id, epic.id);
+  assert.equal(ctx.goal.text, 'Ship the CSV importer');
+  gemini('claim_task', { id: docs.id });
+  gemini('comment_task', { id: docs.id, body: '@codex which flag turns on semicolons?' });
+  assert.ok(codex('inbox').messages.some((m) => m.kind === 'mention' && /which flag/.test(m.body)));
+  gemini('update_task', { id: docs.id, version: gemini('get_task', { id: docs.id }).version, status: 'done' });
+
+  // The lead closes the epic; the board says the goal is reached.
+  claude('update_task', { id: epic.id, version: claude('get_task', { id: epic.id }).version, status: 'done' });
+  const sum = codex('board_summary');
+  assert.equal(sum.complete, true);
+  assert.match(sum.next, /stop/);
+  assert.equal(codex('next_task', {}).goalComplete, true);
+});
+
+test('loops are escalated: review ping-pong and handoff bounces', () => {
+  const s = tmpStore();
+  s.registerAgent({ actor: 'gemini', skills: ['review'] });
+  const t = s.createTask({ title: 'Disputed', review: true, actor: 'x' });
+  s.claimTask(t.id, { actor: 'codex' });
+  for (let i = 0; i < 3; i++) {
+    s.submitForReview(t.id, { actor: 'codex', summary: `try ${i}`, verification: 'tests' });
+    s.reviewTask(t.id, { actor: 'gemini', approve: false, comment: 'not what I meant' });
+  }
+  const e = s.getTask(t.id);
+  assert.match(e.escalated.reason, /sent back in review 3 times/);
+  assert.ok(e.priority <= 1);
+  assert.equal(s.inbox({ actor: 'you' }).escalations[0].id, t.id);
+  assert.throws(() => s.resolveEscalation(t.id, { actor: 'codex' }), /only a human or the lead/);
+  assert.equal(s.resolveEscalation(t.id, { actor: 'you', note: 'clarified the spec' }).escalated, null);
+
+  const b = s.createTask({ title: 'Hot potato', actor: 'x' });
+  s.claimTask(b.id, { actor: 'a' });
+  s.handoff(b.id, { actor: 'a', to: 'b', summary: 'yours' });
+  for (let i = 0; i < 3; i++) {
+    s.handoff(b.id, { actor: 'b', to: 'a', summary: 'no, yours' });
+    s.handoff(b.id, { actor: 'a', to: 'b', summary: 'no, yours' });
+  }
+  assert.match(s.getTask(b.id).escalated.reason, /handed back and forth/);
+});
+
+test('handoff to a skill reaches the least busy agent online with it', () => {
+  const s = tmpStore();
+  s.registerAgent({ actor: 'py1', skills: ['python'] });
+  s.registerAgent({ actor: 'py2', skills: ['python'] });
+  const busy = s.createTask({ title: 'Busy', actor: 'x' });
+  s.claimTask(busy.id, { actor: 'py1' });
+  const t = s.createTask({ title: 'Port it', actor: 'x' });
+  s.claimTask(t.id, { actor: 'claude' });
+  const h = s.handoff(t.id, { actor: 'claude', to: 'skill:python', summary: 'needs Python', nextSteps: 'port utils.js' });
+  assert.equal(h.assignee, 'py2');
+  assert.match(s.inbox({ actor: 'py2' }).messages[0].body, /Handed "Port it" to you/);
+  const t2 = s.createTask({ title: 'Rust it', actor: 'x' });
+  s.claimTask(t2.id, { actor: 'claude' });
+  const h2 = s.handoff(t2.id, { actor: 'claude', to: 'skill:rust', summary: 'needs Rust' });
+  assert.equal(h2.assignee, null);
+  assert.deepEqual(h2.skills, ['rust']);
+});
+
+test('two reviewers can be required; a human or the lead closes with one', () => {
+  const s = tmpStore();
+  const t = s.createTask({ title: 'Security fix', review: true, reviewsRequired: 2, actor: 'x' });
+  s.claimTask(t.id, { actor: 'codex' });
+  s.submitForReview(t.id, { actor: 'codex', summary: 'fixed', verification: 'exploit no longer works', reviewer: 'claude' });
+  assert.equal(s.reviewTask(t.id, { actor: 'claude', approve: true }).status, 'review');
+  assert.throws(() => s.reviewTask(t.id, { actor: 'claude', approve: true }), /already approved/);
+  const done = s.reviewTask(t.id, { actor: 'gemini', approve: true });
+  assert.equal(done.status, 'done');
+  assert.equal(done.reviewedBy, 'claude, gemini');
+});
+
+test('workboard: inbox, questions, messages, split, lead and goal by file', () => {
+  const s = tmpStore();
+  const dir = tmpDir('ah-wb2-');
+  const file = path.join(dir, wb.BOARD);
+  wb.syncOnce(s, dir);
+  const run = (...lines) => { fs.appendFileSync(file, `${lines.join('\n')}\n`); return wb.syncOnce(s, dir).results; };
+  run('aider: hello vendor=open-source skills=python', 'copilot: hello vendor=GitHub skills=review');
+  let r = run('aider: lead', 'aider: goal Release 1.0 | done when: tagged and published', 'aider: new P1 Big refactor');
+  assert.deepEqual(r.map((x) => x.ok), [true, true, true]);
+  const big = s.listTasks()[0].id.slice(5, 11);
+  r = run(`aider: split ${big} seq Extract module; Update callers`);
+  assert.ok(r[0].ok, r[0].message);
+  const sub = s.listTasks().find((t) => t.title === 'Extract module').id.slice(5, 11);
+  r = run(`copilot: claim ${sub}`, `copilot: ask ${sub} @aider keep the old export?`, 'copilot: msg @everyone pausing the CI job for an hour');
+  assert.deepEqual(r.map((x) => x.ok), [true, true, true]);
+  let text = fs.readFileSync(file, 'utf8');
+  assert.match(text, /\*\*Goal:\*\* Release 1\.0 — \*\*done when:\*\* tagged and published/);
+  assert.match(text, /## Questions waiting for an answer[\s\S]*copilot\*\* asks @aider: keep the old export\?/);
+  assert.match(text, /aider ★ lead/);
+  r = run('aider: inbox', `aider: answer ${sub} yes, re-export it`, `copilot: done ${sub} extracted | verified: unit tests green`);
+  assert.match(r[0].message, /keep the old export/);
+  assert.ok(r[1].ok && r[2].ok, JSON.stringify(r));
+  text = fs.readFileSync(file, 'utf8');
+  assert.doesNotMatch(text, /## Questions waiting/);
 });

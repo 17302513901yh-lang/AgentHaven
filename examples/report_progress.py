@@ -65,7 +65,10 @@ def main():
         if state["status"] == "blocked":
             print("Stopped by the board:", state["blockedReason"])
             return
-    call("POST", f"/api/tasks/{task['id']}/submit", {"summary": f"Trained {epochs} epochs, final accuracy {acc:.3f}."})
+    call("POST", f"/api/tasks/{task['id']}/submit", {
+        "summary": f"Trained {epochs} epochs.",
+        "verification": f"Final accuracy {acc:.3f} and loss {loss:.3f} on the validation set after epoch {epochs}.",
+    })
     print("Sent to review.")
 
 

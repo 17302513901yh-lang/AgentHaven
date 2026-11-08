@@ -18,7 +18,8 @@ const ACTIVE = ['doing', 'blocked', 'review'];
 const AGENT_KINDS = ['llm', 'human', 'neural-network', 'script', 'other'];
 const WORKSPACE_RE = /^[a-zA-Z0-9_-]{1,64}$/;
 const SCHEMA = 2;
-const LIMITS = { files: 100, deps: 50, skills: 20, criteria: 50, comments: 300, metricKeys: 20, metricPoints: 500, log: 5000 };
+const ESCALATE_AT = 3; // expiries, rejections or handoff bounces before a task is escalated
+const LIMITS = { messages: 2000, files: 100, deps: 50, skills: 20, criteria: 50, comments: 300, metricKeys: 20, metricPoints: 500, log: 5000 };
 
 const minutes = (env, fallback) => {
   const n = Number(env);
@@ -102,6 +103,12 @@ function nonNegative(value, field) {
   return value;
 }
 
+function reviewsOf(value) {
+  if (value === undefined || value === null) return 1;
+  if (!Number.isInteger(value) || value < 1 || value > 5) throw new ValidationError('reviewsRequired must be 1 to 5');
+  return value;
+}
+
 function budgetOf(value) {
   if (value === undefined) return undefined;
   if (value === null) return null;
@@ -140,6 +147,14 @@ function upgradeTask(t) {
   t.handoffs ||= [];
   t.leaseUntil ??= null;
   t.blockedReason ??= null;
+  t.parent ??= null;
+  t.questions ||= [];
+  t.reviewer ??= null;
+  t.reviewsRequired ??= 1;
+  t.approvals ||= [];
+  t.verification ??= null;
+  t.escalated ??= null;
+  t.counters ||= { expiries: 0, rejections: 0, bounces: 0 };
   return t;
 }
 
@@ -164,7 +179,8 @@ class Store {
       data = {};
     }
     data.schema = SCHEMA;
-    data.tasks ||= []; data.notes ||= []; data.log ||= []; data.agents ||= {}; data.settings ||= {};
+    data.tasks ||= []; data.notes ||= []; data.log ||= []; data.agents ||= {}; data.settings ||= {}; data.messages ||= [];
+    data.msgSeq ??= 0;
     data.seq ??= data.log.length;
     data.log.forEach((e, i) => { e.seq ??= i + 1; });
     data.tasks.forEach(upgradeTask);
@@ -228,6 +244,8 @@ class Store {
       task.handoffs.push({ at: now(), from, to: null, summary: `Lease expired: no sign of life from ${from} for ${Math.round(this.leaseMs / 60000)} min. Back on the board.`, nextSteps: '', auto: true });
       Object.assign(task, { assignee: null, status: 'todo', leaseUntil: null, updatedAt: now(), lastActor: 'agenthaven', version: task.version + 1 });
       Store.log(data, 'agenthaven', 'task.lease_expired', task.id, { from });
+      task.counters.expiries += 1;
+      if (task.counters.expiries >= ESCALATE_AT) Store.escalate(data, task, `claims expired ${task.counters.expiries} times: the task is probably too big or unclear (split it or clarify it)`);
     }
   }
 
@@ -280,7 +298,7 @@ class Store {
     return Object.values(data.agents).map((a) => {
       const age = t0 - Date.parse(a.lastSeen || 0);
       const doing = data.tasks.filter((t) => t.assignee === a.name && ACTIVE.includes(t.status)).map((t) => ({ id: t.id, title: t.title, status: t.status }));
-      return { ...a, skills: a.skills || [], presence: age < ONLINE_MS ? 'online' : age < IDLE_MS ? 'idle' : 'offline', tasks: doing };
+      return { ...a, role: data.settings.lead === a.name ? 'lead' : undefined, skills: a.skills || [], presence: age < ONLINE_MS ? 'online' : age < IDLE_MS ? 'idle' : 'offline', tasks: doing };
     }).sort((a, b) => Date.parse(b.lastSeen || 0) - Date.parse(a.lastSeen || 0));
   }
 
@@ -328,12 +346,169 @@ class Store {
     return actor === 'you' || data.agents[actor]?.kind === 'human';
   }
 
+  // Who may do what a human does (close any task, raise budgets, apply dreams, answer escalations):
+  // a human, or the lead agent. With no human around (agents-only mode) an agent can take the lead.
+  static isAuthority(data, actor) {
+    return Store.isHuman(data, actor) || (Boolean(data.settings.lead) && data.settings.lead === actor);
+  }
+
+  // Agents-only unless a human says otherwise; with no human ever on the board it is on by itself.
+  static agentsOnly(data) {
+    return data.settings.agentsOnly ?? !Object.values(data.agents).some((a) => a.kind === 'human');
+  }
+
+  static leadOnline(data) {
+    const lead = data.settings.lead && data.agents[data.settings.lead];
+    return Boolean(lead && Date.now() - Date.parse(lead.lastSeen || 0) < IDLE_MS);
+  }
+
+  // ---- messages ---------------------------------------------------------------
+
+  // `to`: an agent name, "everyone", "humans" (people and the lead) or "skill:<name>".
+  static message(data, { from, to, body, task = null, kind = 'message' }) {
+    data.msgSeq += 1;
+    const m = { id: newId('msg'), seq: data.msgSeq, at: now(), from, to, body, task, kind };
+    data.messages.push(m);
+    if (data.messages.length > LIMITS.messages) data.messages.splice(0, data.messages.length - LIMITS.messages);
+    return m;
+  }
+
+  static mentions(data, from, body, task) {
+    const names = [...new Set((body.match(/(^|[^\w@])@([\w.-]{1,100})/g) || []).map((m) => m.replace(/^[^@]*@/, '')))];
+    for (const name of names) if (name !== from && (data.agents[name] || name === 'everyone' || name === 'humans')) Store.message(data, { from, to: name, body, task, kind: 'mention' });
+  }
+
+  static forMe(data, m, actor) {
+    if (m.from === actor) return false;
+    if (m.to === actor || m.to === 'everyone') return true;
+    if (m.to === 'humans') return Store.isAuthority(data, actor);
+    if (m.to.startsWith('skill:')) return (data.agents[actor]?.skills || []).includes(m.to.slice(6));
+    return false;
+  }
+
+  sendMessage({ actor, to, body, task }) {
+    actor = requireText(actor, 'actor', 100);
+    to = requireText(to, 'to', 100);
+    body = requireText(body, 'body', 5000);
+    return this.withLock((data) => {
+      if (task) Store.findTask(data, task);
+      const m = Store.message(data, { from: actor, to, body, task: task || null });
+      Store.seen(data, actor);
+      Store.log(data, actor, 'message.sent', task || null, { to, body: body.slice(0, 200) });
+      return m;
+    });
+  }
+
+  // Everything that needs this agent's attention, in one call.
+  inbox({ actor, markRead = true } = {}) {
+    actor = requireText(actor, 'actor', 100);
+    const build = (data) => {
+      const agent = data.agents[actor];
+      const since = agent?.inboxSeq || 0;
+      const skills = agent?.skills || [];
+      const authority = Store.isAuthority(data, actor);
+      const toMe = (to) => to === actor || (to === 'humans' && authority) || (to?.startsWith('skill:') && skills.includes(to.slice(6))) || to === 'everyone';
+      const messages = data.messages.filter((m) => m.seq > since && Store.forMe(data, m, actor));
+      const questions = data.tasks.flatMap((t) => t.questions.filter((q) => !q.answer && q.from !== actor && (toMe(q.to) || (q.to === 'anyone'))).map((q) => ({ task: t.id, title: t.title, ...q })));
+      const answers = data.tasks.flatMap((t) => t.questions.filter((q) => q.from === actor && q.answer && !q.seenByAsker).map((q) => ({ task: t.id, title: t.title, ...q })));
+      const reviews = data.tasks.filter((t) => t.status === 'review' && t.assignee !== actor && !t.approvals.includes(actor)
+        && (t.reviewer === actor || (!t.reviewer && (skills.includes('review') || authority)))).map((t) => ({ id: t.id, title: t.title, by: t.assignee, verification: t.verification }));
+      const escalations = authority ? data.tasks.filter((t) => t.escalated && t.status !== 'done').map((t) => ({ id: t.id, title: t.title, reason: t.escalated.reason, at: t.escalated.at })) : [];
+      const mine = data.tasks.filter((t) => t.assignee === actor && t.status !== 'done').map((t) => ({ id: t.id, title: t.title, status: t.status, newComments: t.comments.filter((c) => c.actor !== actor && Date.parse(c.at) > Date.parse(agent?.inboxAt || 0)).length }));
+      return { agent: actor, role: data.settings.lead === actor ? 'lead' : authority ? 'human' : 'agent', messages, questions, answers, reviews, escalations, myTasks: mine,
+        goal: data.settings.goal || null, count: messages.length + questions.length + answers.length + reviews.length + escalations.length };
+    };
+    if (!markRead) return build(this.fresh());
+    return this.withLock((data) => {
+      const res = build(data);
+      const agent = Store.seen(data, actor);
+      agent.inboxSeq = data.msgSeq;
+      agent.inboxAt = now();
+      for (const t of data.tasks) for (const q of t.questions) if (q.from === actor && q.answer) q.seenByAsker = true;
+      return res;
+    });
+  }
+
+  // ---- escalation -----------------------------------------------------------
+
+  // Loops and ping-pong are not solved by the agents caught in them: flag the task
+  // for the lead or a human, and put it near the top of the board.
+  static escalate(data, task, reason) {
+    if (task.escalated) return;
+    task.escalated = { at: now(), reason };
+    task.priority = Math.min(task.priority, 1);
+    task.comments.push({ id: newId('cmt'), at: now(), actor: 'agenthaven', body: `Escalated: ${reason}`, kind: 'escalation' });
+    Store.message(data, { from: 'agenthaven', to: 'humans', body: `"${task.title}" needs a decision: ${reason}`, task: task.id, kind: 'escalation' });
+    Store.log(data, 'agenthaven', 'task.escalated', task.id, reason);
+  }
+
+  resolveEscalation(id, { actor, note }) {
+    actor = requireText(actor, 'actor', 100);
+    return this.withLock((data) => {
+      if (!Store.isAuthority(data, actor)) throw new ConflictError('only a human or the lead resolves escalations');
+      const task = Store.findTask(data, id);
+      if (!task.escalated) throw new ConflictError('task is not escalated', task);
+      task.comments.push({ id: newId('cmt'), at: now(), actor, body: `Escalation resolved${note ? `: ${note}` : ''}`, kind: 'escalation' });
+      task.escalated = null;
+      task.counters = { expiries: 0, rejections: 0, bounces: 0 };
+      Object.assign(task, { updatedAt: now(), lastActor: actor, version: task.version + 1 });
+      Store.log(data, actor, 'task.escalation_resolved', id, note || '');
+      return task;
+    });
+  }
+
+  // ---- lead, agents-only mode and the goal -----------------------------------------
+
+  // A human appoints the lead; in agents-only mode an agent may take the lead
+  // when there is none or the current lead has gone quiet.
+  takeLead({ actor, agent }) {
+    actor = requireText(actor, 'actor', 100);
+    return this.withLock((data) => {
+      const target = agent ? requireText(agent, 'agent', 100) : actor;
+      if (!Store.isAuthority(data, actor)) {
+        if (target !== actor) throw new ConflictError('only a human appoints someone else as lead');
+        if (!Store.agentsOnly(data)) throw new ConflictError('a human appoints the lead; agents can take the lead only in agents-only mode');
+        if (data.settings.lead && data.settings.lead !== actor && Store.leadOnline(data)) throw new ConflictError(`${data.settings.lead} is the lead and online`);
+      }
+      const prev = data.settings.lead || null;
+      data.settings.lead = target;
+      Store.seen(data, target);
+      Store.message(data, { from: actor, to: 'everyone', body: `${target} is now the lead${prev && prev !== target ? ` (was ${prev})` : ''}.`, kind: 'lead' });
+      Store.log(data, actor, 'lead.changed', target, { from: prev });
+      return { lead: target, previous: prev };
+    });
+  }
+
+  setMode({ actor, agentsOnly }) {
+    actor = requireText(actor, 'actor', 100);
+    return this.withLock((data) => {
+      if (!Store.isAuthority(data, actor)) throw new ConflictError('only a human or the lead changes the mode');
+      data.settings.agentsOnly = Boolean(agentsOnly);
+      Store.log(data, actor, 'settings.updated', this.workspace, `agentsOnly=${data.settings.agentsOnly}`);
+      return { agentsOnly: Store.agentsOnly(data), lead: data.settings.lead || null };
+    });
+  }
+
+  setGoal({ actor, text, doneWhen }) {
+    actor = requireText(actor, 'actor', 100);
+    return this.withLock((data) => {
+      if (!Store.isAuthority(data, actor)) throw new ConflictError('only a human or the lead sets the goal');
+      data.settings.goal = text ? { text: requireText(text, 'goal', 2000), doneWhen: optionalText(doneWhen, 'doneWhen', 2000) || '', by: actor, at: now() } : null;
+      Store.message(data, { from: actor, to: 'everyone', body: text ? `New goal: ${text}${doneWhen ? ` — done when: ${doneWhen}` : ''}` : 'The goal was cleared.', kind: 'goal' });
+      Store.log(data, actor, 'goal.set', this.workspace, text || '');
+      return data.settings.goal;
+    });
+  }
+
   // Done means: criteria met, and reviewed by someone else when the task asks for review.
   // A human may close any task; an agent only its own (or an unclaimed) task without review.
   static assertCanFinish(data, task, actor) {
     const open = task.criteria.filter((c) => !c.done);
     if (open.length) throw new ConflictError(`${open.length} acceptance criteria still open: ${open.map((c) => c.text).join('; ')}`, task);
-    if (Store.isHuman(data, actor)) return;
+    const kids = data.tasks.filter((t) => t.parent === task.id && t.status !== 'done');
+    if (kids.length) throw new ConflictError(`${kids.length} subtask(s) still open: ${kids.map((k) => `"${k.title}"`).join(', ')}`, task);
+    if (task.questions.some((q) => !q.answer)) throw new ConflictError('a question on this task is still open; answer it or withdraw it first', task);
+    if (Store.isAuthority(data, actor)) return;
     if (task.review) throw new ConflictError('this task needs review by someone else: use submit_for_review, then another agent or a human approves', task);
   }
 
@@ -349,16 +524,51 @@ class Store {
     const data = this.fresh();
     return data.tasks
       .filter((t) => (!status || t.status === status) && (!assignee || t.assignee === assignee))
-      .map((t) => (full ? t : { ...Store.summary(t), waitingOn: Store.depsOpen(data, t).map((d) => d.id) }));
+      .map((t) => (full ? t : { ...Store.summary(t), waitingOn: Store.depsOpen(data, t).map((d) => d.id), children: Store.children(data, t), openQuestions: t.questions.filter((q) => !q.answer).length }));
+  }
+
+  static children(data, task) {
+    const kids = data.tasks.filter((t) => t.parent === task.id);
+    return kids.length ? { total: kids.length, done: kids.filter((k) => k.status === 'done').length } : null;
   }
 
   getTask(id) {
     const data = this.fresh();
     const task = Store.findTask(data, id);
-    return { ...task, waitingOn: Store.depsOpen(data, task).map((d) => ({ id: d.id, title: d.title, status: d.status })) };
+    return { ...task, waitingOn: Store.depsOpen(data, task).map((d) => ({ id: d.id, title: d.title, status: d.status })),
+      subtasks: data.tasks.filter((t) => t.parent === task.id).map((t) => ({ id: t.id, title: t.title, status: t.status, assignee: t.assignee })) };
   }
 
-  createTask({ title, description, files, dependsOn, priority, skills, criteria, review, budget, actor }) {
+  // Everything an agent needs to pick a task up cold, in one call: no lost context at handoffs.
+  getContext(id, { actor } = {}) {
+    const data = this.fresh();
+    const task = Store.findTask(data, id);
+    const brief = (t) => t && { id: t.id, title: t.title, status: t.status, assignee: t.assignee };
+    const outcome = (t) => ({ ...brief(t), lastHandoff: t.handoffs[t.handoffs.length - 1] || null, verification: t.verification, reviewedBy: t.reviewedBy || null });
+    const words = new Set(`${task.title} ${task.description}`.toLowerCase().match(/[a-z0-9]{4,}/g) || []);
+    const related = data.notes.filter((n) => !n.tags.includes('lesson'))
+      .map((n) => ({ n, score: (`${n.title} ${n.body}`.toLowerCase().match(/[a-z0-9]{4,}/g) || []).filter((w) => words.has(w)).length }))
+      .filter((x) => x.score > 1).sort((a, b) => b.score - a.score).slice(0, 5).map(({ n }) => ({ id: n.id, title: n.title, body: n.body.slice(0, 1500) }));
+    const claims = data.tasks.filter((t) => t.id !== task.id && ACTIVE.includes(t.status) && t.assignee && t.files.some((f) => task.files.some((g) => overlaps(f, g))))
+      .map((t) => ({ task: t.id, title: t.title, agent: t.assignee, files: t.files }));
+    const t0 = Date.now();
+    const helpers = Object.values(data.agents).filter((a) => a.name !== actor && t0 - Date.parse(a.lastSeen || 0) < ONLINE_MS && (!task.skills.length || task.skills.some((sk) => (a.skills || []).includes(sk))))
+      .map((a) => ({ name: a.name, vendor: a.vendor, skills: a.skills || [] }));
+    return {
+      task: { ...task, metrics: undefined },
+      goal: data.settings.goal || null,
+      parent: task.parent ? brief(data.tasks.find((t) => t.id === task.parent)) : null,
+      subtasks: data.tasks.filter((t) => t.parent === task.id).map(brief),
+      dependencies: task.dependsOn.map((d) => data.tasks.find((t) => t.id === d)).filter(Boolean).map(outcome),
+      openQuestions: task.questions.filter((q) => !q.answer),
+      recentComments: task.comments.slice(-20),
+      relatedNotes: related,
+      filesInUseNearby: claims,
+      helpersOnline: helpers,
+    };
+  }
+
+  createTask({ title, description, files, dependsOn, priority, skills, criteria, review, budget, parent, reviewsRequired, reviewer, actor }) {
     actor = requireText(actor, 'actor', 100);
     return this.withLock((data) => {
       const id = newId('task');
@@ -375,6 +585,9 @@ class Store {
         criteria: criteria === undefined ? [] : criteriaFrom(criteria),
         review: Boolean(review),
         budget: budgetOf(budget) || null,
+        parent: parent ? Store.findTask(data, String(parent)).id : null,
+        reviewsRequired: reviewsOf(reviewsRequired),
+        reviewer: reviewer ? requireText(reviewer, 'reviewer', 100) : null,
         createdBy: actor,
         createdAt: now(),
         updatedAt: now(),
@@ -397,7 +610,7 @@ class Store {
       if (task.version !== version) {
         throw new ConflictError(`task was changed by ${task.lastActor || task.createdBy} (version ${task.version}); re-read and retry`, task);
       }
-      if (task.assignee && task.assignee !== actor && !Store.isHuman(data, actor)) {
+      if (task.assignee && task.assignee !== actor && !Store.isAuthority(data, actor)) {
         throw new ConflictError(`${task.assignee} holds this task; comment on it or ask them to hand it off`, task);
       }
       const applied = {};
@@ -415,6 +628,12 @@ class Store {
       if (changes.criteria !== undefined) applied.criteria = criteriaFrom(changes.criteria, task.criteria);
       if (changes.review !== undefined) applied.review = Boolean(changes.review);
       if (changes.budget !== undefined) applied.budget = budgetOf(changes.budget);
+      if (changes.reviewsRequired !== undefined) applied.reviewsRequired = reviewsOf(changes.reviewsRequired);
+      if (changes.reviewer !== undefined) applied.reviewer = changes.reviewer ? requireText(changes.reviewer, 'reviewer', 100) : null;
+      if (changes.parent !== undefined) {
+        if (changes.parent === id) throw new ValidationError('a task cannot be its own parent');
+        applied.parent = changes.parent ? Store.findTask(data, String(changes.parent)).id : null;
+      }
       if (changes.blockedReason !== undefined) applied.blockedReason = optionalText(changes.blockedReason, 'blockedReason', 500) || null;
       if (!Object.keys(applied).length) throw new ValidationError('nothing to update');
       const next = { ...task, ...applied };
@@ -435,6 +654,8 @@ class Store {
   static claimInLock(store, data, task, actor) {
     if (task.status === 'done') throw new ConflictError('task is already done', task);
     if (task.assignee && task.assignee !== actor) throw new ConflictError(`task is already claimed by ${task.assignee}`, task);
+    const kids = data.tasks.filter((t) => t.parent === task.id && t.status !== 'done');
+    if (kids.length) throw new ConflictError(`this task is split into subtasks; claim one of them: ${kids.map((k) => `"${k.title}" (${k.id})`).join(', ')}`, task);
     const open = Store.depsOpen(data, task);
     if (open.length) throw new ConflictError(`waiting on ${open.map((d) => `"${d.title}" (${d.id}, ${d.status})`).join(', ')}`, task);
     Store.assertFilesFree(data, task.id, actor, task.files);
@@ -453,11 +674,17 @@ class Store {
   // Why a task cannot be picked up by `actor` right now, or null when it can.
   static blocker(data, task, actor, skills) {
     if (task.status !== 'todo' || task.assignee) return 'not open';
+    if (data.tasks.some((t) => t.parent === task.id && t.status !== 'done')) return 'split into subtasks: work on those';
     const open = Store.depsOpen(data, task);
     if (open.length) return `waits on ${open.length} task(s)`;
     if (task.skills.some((s) => !skills.includes(s))) return `needs skills ${task.skills.join(', ')}`;
     try { Store.assertFilesFree(data, task.id, actor, task.files); } catch (err) { return err.message; }
     return null;
+  }
+
+  static unread(data, actor) {
+    const since = data.agents[actor]?.inboxSeq || 0;
+    return data.messages.filter((m) => m.seq > since && Store.forMe(data, m, actor)).length;
   }
 
   // Pull model: hands the agent the most important task it can start now.
@@ -471,11 +698,11 @@ class Store {
       const reasons = [];
       for (const t of open) {
         const why = Store.blocker(data, t, actor, own);
-        if (!why) return { task: t, alreadyDoing: mine ? mine.id : null, skipped: reasons.slice(0, 20) };
+        if (!why) return { task: t, alreadyDoing: mine ? mine.id : null, skipped: reasons.slice(0, 20), unread: Store.unread(data, actor) };
         reasons.push(`${t.id}: ${why}`);
       }
       const reviewable = data.tasks.filter((t) => t.status === 'review' && t.assignee !== actor).map((t) => ({ id: t.id, title: t.title, by: t.assignee }));
-      return { task: null, alreadyDoing: mine ? mine.id : null, skipped: reasons.slice(0, 20), reviewable,
+      return { task: null, alreadyDoing: mine ? mine.id : null, skipped: reasons.slice(0, 20), reviewable, unread: Store.unread(data, actor), goalComplete: data.tasks.length > 0 && data.tasks.every((t) => t.status === 'done'),
         hint: open.length ? 'No open task fits right now (see skipped).' : 'The board has no open tasks. Review work in "reviewable" or create the next task.' };
     };
     if (!claim) return pick(this.fresh());
@@ -489,11 +716,28 @@ class Store {
   handoff(id, { actor, to, summary, nextSteps }) {
     actor = requireText(actor, 'actor', 100);
     summary = requireText(summary, 'summary');
-    const target = to ? requireText(to, 'to', 100) : null;
+    let target = to ? requireText(to, 'to', 100) : null;
     return this.withLock((data) => {
       const task = Store.findTask(data, id);
-      if (task.assignee && task.assignee !== actor && !Store.isHuman(data, actor)) throw new ConflictError(`only ${task.assignee} can hand off this task`, task);
+      if (task.assignee && task.assignee !== actor && !Store.isAuthority(data, actor)) throw new ConflictError(`only ${task.assignee} can hand off this task`, task);
+      if (target?.startsWith('skill:')) {
+        // Hand to whoever has the skill: the least busy agent online, else back on the board with that skill.
+        const skill = target.slice(6).toLowerCase();
+        const t0 = Date.now();
+        const load = (n) => data.tasks.filter((t) => t.assignee === n && ACTIVE.includes(t.status)).length;
+        const pick = Object.values(data.agents).filter((a) => a.name !== actor && (a.skills || []).includes(skill) && t0 - Date.parse(a.lastSeen || 0) < ONLINE_MS)
+          .sort((a, b) => load(a.name) - load(b.name))[0];
+        if (!task.skills.includes(skill)) task.skills.push(skill);
+        target = pick ? pick.name : null;
+      }
       if (target) Store.assertFilesFree(data, id, target, task.files);
+      // Ping-pong: handing a task straight back to the agent who just handed it to you.
+      const last = task.handoffs[task.handoffs.length - 1];
+      if (target && last && last.to === actor && last.from === target) {
+        task.counters.bounces += 1;
+        if (task.counters.bounces >= ESCALATE_AT) Store.escalate(data, task, `handed back and forth ${task.counters.bounces} times between ${actor} and ${target}`);
+      }
+      if (target && target !== actor) Store.message(data, { from: actor, to: target, body: `Handed "${task.title}" to you: ${summary}${nextSteps ? ` — next: ${nextSteps}` : ''}`, task: id, kind: 'handoff' });
       const entry = { at: now(), from: actor, to: target, summary, nextSteps: optionalText(nextSteps, 'nextSteps') || '' };
       task.handoffs.push(entry);
       Object.assign(task, { assignee: target, status: target ? 'doing' : 'todo', updatedAt: now(), lastActor: actor, version: task.version + 1 });
@@ -504,16 +748,106 @@ class Store {
     });
   }
 
+  // Breaks a task into subtasks. The parent is done only when every subtask is.
+  splitTask(id, { actor, parts, sequential = false }) {
+    actor = requireText(actor, 'actor', 100);
+    if (!Array.isArray(parts) || !parts.length || parts.length > 20) throw new ValidationError('parts must be a list of 1 to 20 subtasks');
+    return this.withLock((data) => {
+      const parent = Store.findTask(data, id);
+      if (parent.assignee && parent.assignee !== actor && !Store.isAuthority(data, actor)) throw new ConflictError(`${parent.assignee} holds this task`, parent);
+      const made = [];
+      for (const part of parts) {
+        const p = typeof part === 'string' ? { title: part } : part || {};
+        const child = upgradeTask({
+          id: newId('task'), title: requireText(p.title, 'subtask title', 200), description: optionalText(p.description, 'description') || '',
+          status: 'todo', priority: p.priority === undefined ? parent.priority : priorityOf(p.priority), assignee: null,
+          files: p.files === undefined ? [] : normFiles(p.files), skills: p.skills === undefined ? parent.skills.slice() : normWords(p.skills, LIMITS.skills),
+          criteria: p.criteria === undefined ? [] : criteriaFrom(p.criteria), review: p.review === undefined ? parent.review : Boolean(p.review),
+          dependsOn: sequential && made.length ? [made[made.length - 1].id] : [], parent: parent.id,
+          createdBy: actor, createdAt: now(), updatedAt: now(), version: 1,
+        });
+        data.tasks.push(child);
+        made.push(child);
+        Store.log(data, actor, 'task.created', child.id, child.title);
+      }
+      // A parent being split is coordination, not work in progress: free its files and lease.
+      if (parent.status === 'doing') Object.assign(parent, { status: 'todo', assignee: null, leaseUntil: null });
+      parent.comments.push({ id: newId('cmt'), at: now(), actor, body: `Split into ${made.length} subtask(s): ${made.map((c) => c.title).join('; ')}`, kind: 'split' });
+      Object.assign(parent, { updatedAt: now(), lastActor: actor, version: parent.version + 1 });
+      Store.seen(data, actor);
+      Store.log(data, actor, 'task.split', id, made.length);
+      return { parent: parent.id, subtasks: made };
+    });
+  }
+
+  // ---- questions ------------------------------------------------------------
+
+  // Ask instead of guessing. When the agent holding the task asks, the task waits
+  // (blocked, lease paused) until the answer comes.
+  askQuestion(id, { actor, to = 'anyone', question }) {
+    actor = requireText(actor, 'actor', 100);
+    question = requireText(question, 'question', 3000);
+    to = requireText(to, 'to', 100);
+    return this.withLock((data) => {
+      const task = Store.findTask(data, id);
+      const q = { id: newId('q'), at: now(), from: actor, to, text: question, answer: null };
+      task.questions.push(q);
+      if (task.assignee === actor && task.status === 'doing') Object.assign(task, { status: 'blocked', blockedReason: `Waiting for an answer from ${to}: ${question.slice(0, 200)}`, leaseUntil: null });
+      Object.assign(task, { updatedAt: now(), lastActor: actor, version: task.version + 1 });
+      Store.message(data, { from: actor, to: to === 'anyone' ? 'everyone' : to, body: `Question on "${task.title}": ${question}`, task: id, kind: 'question' });
+      Store.seen(data, actor);
+      Store.log(data, actor, 'task.question', id, { to, question: question.slice(0, 200) });
+      return q;
+    });
+  }
+
+  answerQuestion(id, { actor, question, answer }) {
+    actor = requireText(actor, 'actor', 100);
+    answer = requireText(answer, 'answer', 5000);
+    return this.withLock((data) => {
+      const task = Store.findTask(data, id);
+      const open = task.questions.filter((q) => !q.answer);
+      const q = question ? task.questions.find((x) => x.id === question) : open[open.length - 1];
+      if (!q) throw new NotFoundError(question ? `question ${question} not found` : 'this task has no open question');
+      if (q.answer) throw new ConflictError(`already answered by ${q.answeredBy}`);
+      if (q.from === actor) throw new ConflictError('answer someone else\'s question; to withdraw yours, answer it from another agent or ask a human');
+      Object.assign(q, { answer, answeredBy: actor, answeredAt: now() });
+      if (task.status === 'blocked' && task.blockedReason?.startsWith('Waiting for an answer') && !task.questions.some((x) => !x.answer)) {
+        Object.assign(task, { status: task.assignee ? 'doing' : 'todo', blockedReason: null });
+        this.lease(task);
+      }
+      Object.assign(task, { updatedAt: now(), lastActor: actor, version: task.version + 1 });
+      Store.message(data, { from: actor, to: q.from, body: `Answer on "${task.title}": ${answer}`, task: id, kind: 'answer' });
+      Store.seen(data, actor);
+      Store.log(data, actor, 'task.answered', id, answer.slice(0, 200));
+      return { question: q, status: task.status };
+    });
+  }
+
   // ---- review ---------------------------------------------------------------
 
-  submitForReview(id, { actor, summary }) {
+  // `verification` is how the work was checked (commands, tests, results): reviewers
+  // check that, and "done" never rests on an unverified claim.
+  submitForReview(id, { actor, summary, verification, reviewer }) {
     actor = requireText(actor, 'actor', 100);
     summary = requireText(summary, 'summary');
+    verification = requireText(verification ?? '', 'verification (how you checked the work: commands, tests and their results)', 5000);
     return this.withLock((data) => {
       const task = Store.findTask(data, id);
       if (task.assignee !== actor) throw new ConflictError(task.assignee ? `only ${task.assignee} can submit this task` : 'claim the task first', task);
-      task.comments.push({ id: newId('cmt'), at: now(), actor, body: `Ready for review: ${summary}`, kind: 'review-request' });
-      Object.assign(task, { status: 'review', leaseUntil: null, updatedAt: now(), lastActor: actor, version: task.version + 1 });
+      let who = reviewer ? requireText(reviewer, 'reviewer', 100) : task.reviewer;
+      if (!who || who === 'auto' || who.startsWith('skill:')) {
+        const skill = who?.startsWith('skill:') ? who.slice(6) : 'review';
+        const t0 = Date.now();
+        const load = (n) => data.tasks.filter((t) => t.reviewer === n && t.status === 'review').length;
+        const pool = Object.values(data.agents).filter((a) => a.name !== actor && a.kind !== 'human' && t0 - Date.parse(a.lastSeen || 0) < IDLE_MS);
+        who = (pool.filter((a) => (a.skills || []).includes(skill)).sort((a, b) => load(a.name) - load(b.name))[0]
+          || (who ? pool.sort((a, b) => load(a.name) - load(b.name))[0] : null))?.name || null;
+      }
+      if (who === actor) throw new ConflictError('you cannot review your own work; pick another reviewer', task);
+      task.comments.push({ id: newId('cmt'), at: now(), actor, body: `Ready for review: ${summary}\nVerified: ${verification}`, kind: 'review-request' });
+      Object.assign(task, { status: 'review', reviewer: who, verification, approvals: [], leaseUntil: null, updatedAt: now(), lastActor: actor, version: task.version + 1 });
+      Store.message(data, { from: actor, to: who || 'skill:review', body: `Please review "${task.title}": ${summary}`, task: id, kind: 'review-request' });
       Store.seen(data, actor);
       Store.log(data, actor, 'task.review_requested', id, summary);
       return task;
@@ -528,16 +862,29 @@ class Store {
       const task = Store.findTask(data, id);
       if (task.status !== 'review') throw new ConflictError(`task is ${task.status}, not in review`, task);
       if (task.assignee === actor) throw new ConflictError('you cannot review your own work; ask another agent or a human', task);
+      if (task.approvals.includes(actor)) throw new ConflictError('you already approved this; another reviewer is needed', task);
       if (approve) {
         const open = task.criteria.filter((c) => !c.done);
         if (open.length) throw new ConflictError(`${open.length} acceptance criteria still open: ${open.map((c) => c.text).join('; ')}`, task);
       }
       if (comment) task.comments.push({ id: newId('cmt'), at: now(), actor, body: comment, kind: approve ? 'approval' : 'changes-requested' });
-      Object.assign(task, approve ? { status: 'done', reviewedBy: actor, progress: 100 } : { status: 'doing' });
+      let finished = false;
+      if (approve) {
+        task.approvals.push(actor);
+        finished = task.approvals.length >= task.reviewsRequired || Store.isAuthority(data, actor);
+        if (finished) Object.assign(task, { status: 'done', reviewedBy: task.approvals.join(', '), progress: 100 });
+        else task.reviewer = null; // the next approval may come from anyone else
+      } else {
+        task.approvals = [];
+        task.counters.rejections += 1;
+        Object.assign(task, { status: 'doing' });
+        if (task.counters.rejections >= ESCALATE_AT) Store.escalate(data, task, `sent back in review ${task.counters.rejections} times: author and reviewer disagree on what done means`);
+      }
+      if (task.assignee) Store.message(data, { from: actor, to: task.assignee, body: approve ? (finished ? `Approved "${task.title}".` : `Approved "${task.title}" (${task.approvals.length}/${task.reviewsRequired}).`) : `Changes requested on "${task.title}": ${comment}`, task: id, kind: approve ? 'approval' : 'changes-requested' });
       Object.assign(task, { updatedAt: now(), lastActor: actor, version: task.version + 1 });
       this.lease(task);
       Store.seen(data, actor);
-      Store.log(data, actor, approve ? 'task.approved' : 'task.changes_requested', id, comment || '');
+      Store.log(data, actor, approve ? (finished ? 'task.approved' : 'task.approval') : 'task.changes_requested', id, comment || '');
       return task;
     });
   }
@@ -614,6 +961,8 @@ class Store {
       const task = Store.findTask(data, id);
       const c = { id: newId('cmt'), at: now(), actor, body };
       task.comments.push(c);
+      Store.mentions(data, actor, body, id);
+      if (task.assignee && task.assignee !== actor && !body.includes(`@${task.assignee}`)) Store.message(data, { from: actor, to: task.assignee, body: `Comment on "${task.title}": ${body}`, task: id, kind: 'comment' });
       if (task.comments.length > LIMITS.comments) task.comments.splice(0, task.comments.length - LIMITS.comments);
       Object.assign(task, { updatedAt: now(), version: task.version + 1 });
       if (task.assignee === actor) this.lease(task);
@@ -676,7 +1025,12 @@ class Store {
     for (const t of data.tasks) { counts[t.status] += 1; tokens += t.usage.tokens; costUsd += t.usage.costUsd; }
     const t0 = Date.now();
     const online = Object.values(data.agents).filter((a) => t0 - Date.parse(a.lastSeen || 0) < ONLINE_MS).length;
-    return { counts, total: data.tasks.length, usage: { tokens, costUsd: Math.round(costUsd * 100) / 100 }, agents: Object.keys(data.agents).length, online, seq: data.seq };
+    const complete = data.tasks.length > 0 && counts.done === data.tasks.length;
+    return { counts, total: data.tasks.length, usage: { tokens, costUsd: Math.round(costUsd * 100) / 100 }, agents: Object.keys(data.agents).length, online, seq: data.seq,
+      goal: data.settings.goal || null, complete, escalated: data.tasks.filter((t) => t.escalated && t.status !== 'done').length,
+      openQuestions: data.tasks.reduce((n, t) => n + t.questions.filter((q) => !q.answer).length, 0),
+      lead: data.settings.lead || null, agentsOnly: Store.agentsOnly(data),
+      next: complete ? 'Every task is done. If the goal is reached, stop; otherwise create the tasks that are still missing.' : null };
   }
 
   static listWorkspaces(dataDir = defaultDataDir()) {
@@ -710,4 +1064,4 @@ class Store {
   }
 }
 
-module.exports = { Store, ConflictError, ValidationError, NotFoundError, STATUSES, ACTIVE, AGENT_KINDS, defaultDataDir, overlaps, normFile };
+module.exports = { ESCALATE_AT, Store, ConflictError, ValidationError, NotFoundError, STATUSES, ACTIVE, AGENT_KINDS, defaultDataDir, overlaps, normFile };

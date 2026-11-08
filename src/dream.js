@@ -252,7 +252,7 @@ function findProposal(data, id) {
 function applyProposal(store, id, { actor }) {
   actor = text(actor, 'actor', 100);
   const result = store.withLock((data) => {
-    if (actor !== 'agenthaven' && !Store.isHuman(data, actor)) throw new ConflictError('only a human applies dream proposals (or turn on auto-apply)');
+    if (actor !== 'agenthaven' && !Store.isAuthority(data, actor)) throw new ConflictError('only a human applies dream proposals (or turn on auto-apply)');
     const { p } = findProposal(data, id);
     if (p.status !== 'proposed') throw new ConflictError(`proposal is already ${p.status}`);
     const note = (title, body, tags, extra = {}) => {
@@ -290,7 +290,7 @@ function applyProposal(store, id, { actor }) {
 function dismissProposal(store, id, { actor, reason }) {
   actor = text(actor, 'actor', 100);
   return store.withLock((data) => {
-    if (!Store.isHuman(data, actor)) throw new ConflictError('only a human dismisses dream proposals');
+    if (!Store.isAuthority(data, actor)) throw new ConflictError('only a human dismisses dream proposals');
     const { p } = findProposal(data, id);
     if (p.status !== 'proposed') throw new ConflictError(`proposal is already ${p.status}`);
     Object.assign(p, { status: 'dismissed', dismissedBy: actor, reason: typeof reason === 'string' ? reason.slice(0, 500) : undefined });

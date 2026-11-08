@@ -70,12 +70,17 @@ function card(task) {
     task.criteria.length ? el('span', { className: `tag ${open ? '' : 'ok'}`, title: 'Acceptance criteria', textContent: `✓ ${task.criteria.length - open}/${task.criteria.length}` }) : null,
     task.review ? el('span', { className: 'tag info', title: 'Needs review by someone else', textContent: 'review' }) : null,
     task.comments ? el('span', { className: 'tag', title: 'Comments', textContent: `💬 ${task.comments}` }) : null,
+    task.openQuestions ? el('span', { className: 'tag warn', title: 'Open questions', textContent: `❓ ${task.openQuestions}` }) : null,
+    task.escalated ? el('span', { className: 'tag bad', title: task.escalated.reason, textContent: '⚠ escalated' }) : null,
+    task.children ? el('span', { className: `tag ${task.children.done === task.children.total ? 'ok' : ''}`, title: 'Subtasks done', textContent: `⑂ ${task.children.done}/${task.children.total}` }) : null,
+    task.status === 'review' && task.reviewer ? el('span', { className: 'tag info', title: 'Reviewer', textContent: `👀 ${task.reviewer}` }) : null,
+    task.parent ? el('span', { className: 'tag', title: `Subtask of ${tasks.find((x) => x.id === task.parent)?.title || task.parent}`, textContent: '↳ sub' }) : null,
     task.usage.costUsd || task.usage.tokens ? el('span', { className: `tag ${task.budget ? 'warn' : ''}`, title: 'Spent', textContent: task.usage.costUsd ? money(task.usage.costUsd) + (task.budget?.costUsd !== undefined ? `/${money(task.budget.costUsd)}` : '') : `${tokens(task.usage.tokens)} tok` }) : null,
     task.leaseUntil ? el('span', { className: 'tag', title: `Claim expires ${new Date(task.leaseUntil).toLocaleTimeString()} without activity`, textContent: `⏱ ${until(task.leaseUntil)}` }) : null,
     ...task.skills.map((s) => el('span', { className: 'tag', textContent: s })),
   ];
   const metricBits = Object.entries(task.metrics || {}).slice(0, 3).map(([k, v]) => `${k} ${fmt(v)}`).join(' · ');
-  const node = el('button', { className: `card p${task.priority}${waiting ? ' waiting' : ''}`, type: 'button', draggable: true, title: 'Open (drag to move)', onclick: () => openTask(task.id) },
+  const node = el('button', { className: `card p${task.priority}${waiting ? ' waiting' : ''}${task.escalated ? ' escalated' : ''}`, type: 'button', draggable: true, title: 'Open (drag to move)', onclick: () => openTask(task.id) },
     el('span', { className: 't', textContent: task.title }),
     el('span', { className: 'meta' }, meta),
     task.progress != null && task.status !== 'done' ? el('span', { className: 'bar', title: `${task.progress}%` }, el('span')) : null,
@@ -113,13 +118,14 @@ function renderStats(s) {
   $('#stats').replaceChildren(
     chip('doing', s.counts.doing), chip('to do', s.counts.todo), chip('review', s.counts.review),
     s.counts.blocked ? chip('blocked', s.counts.blocked) : null, chip('done', s.counts.done),
+    s.escalated ? chip('escalated', `⚠ ${s.escalated}`) : null, s.openQuestions ? chip('open questions', `❓ ${s.openQuestions}`) : null,
     chip('agents online', `${s.online}/${s.agents}`), chip('spent', money(s.usage.costUsd), `${tokens(s.usage.tokens)} tokens`));
 }
 
 function renderAgents() {
   $('#agents').replaceChildren(...(agents.length ? agents.map((a) => el('li', {},
     el('span', { title: a.presence }, el('span', { className: `dot ${a.presence}` })),
-    el('span', { className: 'name' }, `${KIND_ICON[a.kind] || '◆'} ${a.name}`),
+    el('span', { className: 'name' }, `${KIND_ICON[a.kind] || '◆'} ${a.name}`, a.role === 'lead' ? el('span', { className: 'lead-badge', textContent: '★ lead' }) : null),
     el('span', { className: 'sub', textContent: [[a.vendor, a.model].filter(Boolean).join(' · '), a.tasks.length ? `on ${a.tasks.map((t) => t.title).join(', ')}` : a.presence === 'online' ? 'free' : `seen ${ago(a.lastSeen)}`, a.status].filter(Boolean).join(' — ') }),
     a.skills.length ? el('span', { className: 'sub', textContent: a.skills.join(', ') }) : null))
     : [el('li', { className: 'empty', textContent: 'No agents yet.' })]));
@@ -136,6 +142,8 @@ async function render() {
   ]);
   tasks = t; agents = ag;
   renderStats(stats);
+  renderTeam(stats);
+  await renderInbox();
   renderAgents();
   $('#board').replaceChildren(...STATUSES.map(column));
   $('#onboarding').hidden = tasks.length > 0 || activity.length > 0;
@@ -218,13 +226,24 @@ function fillDialog(task) {
   $('#dlg-deps').replaceChildren(...(others.length ? others.map((t) => el('label', {}, el('input', { type: 'checkbox', value: t.id, checked: deps.has(t.id) }), `${t.title} `, el('span', { className: 'm', textContent: LABELS[t.status] })))
     : [el('span', { className: 'm', textContent: 'No other open tasks.' })]));
 
+  $('#dlg-escalated').hidden = !task.escalated;
+  $('#dlg-escalated-text').textContent = task.escalated ? `Escalated: ${task.escalated.reason}` : '';
+  const subs = task.subtasks || [];
+  $('#dlg-sub-wrap').hidden = isNew;
+  $('#dlg-subtasks').replaceChildren(...(subs.length ? subs.map((c) => el('li', {}, `${c.status === 'done' ? '✓' : '○'} ${c.title} `, el('span', { className: 'm', textContent: `${LABELS[c.status]}${c.assignee ? ` · ${c.assignee}` : ''}` })))
+    : [el('li', { className: 'm', textContent: 'No subtasks. Split a task that is too big for one session.' })]));
+  const qs = task.questions || [];
+  $('#dlg-questions').replaceChildren(...qs.map((q) => el('li', { className: 'k-question' },
+    el('span', { className: 'm', textContent: `${q.from} asks ${q.to} · ${ago(q.at)}` }), el('div', { className: 'body', textContent: q.text }),
+    q.answer ? el('div', { className: 'body', textContent: `↳ ${q.answeredBy}: ${q.answer}` })
+      : el('div', { className: 'row' }, el('input', { className: 'grow', placeholder: 'Your answer', id: `ans-${q.id}` }), el('button', { type: 'button', textContent: 'Answer', onclick: () => answer(task.id, q.id, $(`#ans-${q.id}`).value) })))));
   const banner = $('#dlg-banner');
   const waiting = task.waitingOn || [];
   banner.hidden = !(task.blockedReason || waiting.length || task.status === 'review');
   banner.className = `banner${task.blockedReason ? ' bad' : ''}`;
   banner.textContent = task.blockedReason ? task.blockedReason
     : waiting.length ? `Starts after: ${waiting.map((w) => `${w.title} (${LABELS[w.status]})`).join(', ')}`
-      : task.status === 'review' ? `${task.assignee} asks for review. Approve, or request changes with a comment.` : '';
+      : task.status === 'review' ? `${task.assignee} asks for review${task.reviewer ? ` by ${task.reviewer}` : ''}${task.reviewsRequired > 1 ? ` (${(task.approvals || []).length}/${task.reviewsRequired} approvals)` : ''}. Verified: ${task.verification || '—'}` : '';
 
   const lessons = task.lessons || [];
   $('#dlg-lessons').hidden = !lessons.length;
@@ -233,8 +252,10 @@ function fillDialog(task) {
   draftCriteria = (task.criteria || []).map((c) => ({ ...c }));
   renderCriteria();
   $('#tab-criteria-n').textContent = draftCriteria.length ? `${draftCriteria.filter((c) => c.done).length}/${draftCriteria.length}` : '';
+  $('#tab-comments-n').textContent = '';
   const comments = task.comments || [];
-  $('#tab-comments-n').textContent = comments.length ? String(comments.length) : '';
+  const openQ = qs.filter((q) => !q.answer).length;
+  $('#tab-comments-n').textContent = comments.length || openQ ? `${comments.length}${openQ ? ` · ❓${openQ}` : ''}` : '';
   $('#dlg-comments').replaceChildren(...(comments.length ? comments.map((c) => el('li', { className: `k-${c.kind || 'comment'}` }, el('span', { className: 'm', textContent: `${c.actor} · ${ago(c.at)}${c.kind ? ` · ${c.kind.replace(/-/g, ' ')}` : ''}` }), el('div', { className: 'body', textContent: c.body })))
     : [el('li', { className: 'empty', textContent: 'No comments yet.' })]));
   $('#comment-new').disabled = isNew; $('#comment-add').disabled = isNew;
@@ -329,6 +350,37 @@ $('#comment-add').addEventListener('click', async () => {
     fillDialog(editing); selectTab('comments');
   } catch (err) { showError(err); }
 });
+async function answer(taskId, qid, text) {
+  if (!text.trim()) return;
+  try {
+    await api(`/api/tasks/${taskId}/answers`, { method: 'POST', body: { question: qid, answer: text } });
+    if (editing?.id === taskId) { editing = await api(`/api/tasks/${taskId}`); fillDialog(editing); selectTab('comments'); }
+    refresh(true);
+  } catch (err) { showError(err); }
+}
+$('#question-add').addEventListener('click', async () => {
+  const text = $('#comment-new').value.trim();
+  if (!text || !editing?.id) return;
+  const m = text.match(/^@(\S+)\s+(.+)$/s);
+  try {
+    await api(`/api/tasks/${editing.id}/questions`, { method: 'POST', body: { to: m ? m[1] : 'anyone', question: m ? m[2] : text } });
+    $('#comment-new').value = '';
+    editing = await api(`/api/tasks/${editing.id}`); fillDialog(editing); selectTab('comments');
+  } catch (err) { showError(err); }
+});
+$('#split-go').addEventListener('click', async () => {
+  const parts = $('#split-parts').value.split(';').map((x) => x.trim()).filter(Boolean);
+  if (!parts.length || !editing?.id) return;
+  try {
+    await api(`/api/tasks/${editing.id}/split`, { method: 'POST', body: { parts, sequential: $('#split-seq').checked } });
+    $('#split-parts').value = '';
+    editing = await api(`/api/tasks/${editing.id}`); fillDialog(editing);
+  } catch (err) { showError(err); }
+});
+$('#dlg-resolve').addEventListener('click', () => {
+  const note = prompt('What did you decide? (split, clarify, reassign, drop)') ?? '';
+  act(() => api(`/api/tasks/${editing.id}/resolve`, { method: 'POST', body: { note } })).then((ok) => ok && $('#task-dialog').close());
+});
 $('#dlg-approve').addEventListener('click', () => act(() => api(`/api/tasks/${editing.id}/review`, { method: 'POST', body: { approve: true } })).then((ok) => ok && $('#task-dialog').close()));
 $('#dlg-reject').addEventListener('click', () => {
   const comment = $('#comment-new').value.trim() || prompt('What must change?');
@@ -371,6 +423,47 @@ document.addEventListener('keydown', (e) => {
   if (document.querySelector('dialog[open]') || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return;
   if (e.key === 'n') { e.preventDefault(); $('#task-title').focus(); }
   if (e.key === '/') { e.preventDefault(); $('#filter').focus(); }
+});
+
+// ---- team, goal and the human inbox ------------------------------------------------
+
+function renderTeam(s) {
+  const bar = $('#goal-bar');
+  bar.hidden = !s.goal && !s.complete;
+  bar.className = `goal-bar${s.complete ? ' done' : ''}`;
+  bar.replaceChildren(...[
+    ...(s.goal ? [el('strong', { textContent: 'Goal' }), el('span', { textContent: s.goal.text }), s.goal.doneWhen ? el('span', { className: 'm', textContent: `· done when: ${s.goal.doneWhen}` }) : null] : []),
+    s.complete ? el('strong', { textContent: '✅ Every task is done' }) : null,
+  ].filter(Boolean));
+  $('#mode-agents').checked = s.agentsOnly;
+  const sel = $('#lead');
+  if (document.activeElement !== sel) {
+    sel.replaceChildren(el('option', { value: '', textContent: s.lead ? '' : 'nobody' }), ...agents.filter((a) => a.kind !== 'human').map((a) => el('option', { value: a.name, textContent: a.name, selected: a.name === s.lead })));
+    if (s.lead && !agents.some((a) => a.name === s.lead)) sel.append(el('option', { value: s.lead, textContent: s.lead, selected: true }));
+  }
+  if (!$('#goal-edit').open) { $('#goal-text').value = s.goal?.text || ''; $('#goal-done').value = s.goal?.doneWhen || ''; }
+}
+
+async function renderInbox() {
+  const r = await api('/api/inbox?markRead=false');
+  const items = [
+    ...r.escalations.map((t) => el('li', {}, el('span', { className: 'kind', textContent: '⚠ Escalated' }), el('a', { href: '#', textContent: t.title, onclick: (e) => { e.preventDefault(); openTask(t.id); } }), el('span', { className: 'm', textContent: t.reason }))),
+    ...r.questions.map((q) => el('li', {}, el('span', { className: 'kind', textContent: `❓ ${q.from} asks` }), el('span', { textContent: q.text }), el('span', { className: 'm', textContent: q.title }),
+      el('span', { className: 'row' }, el('input', { placeholder: 'Answer', id: `ia-${q.id}` }), el('button', { type: 'button', textContent: 'Answer', onclick: () => answer(q.task, q.id, $(`#ia-${q.id}`).value) })))),
+    ...r.reviews.map((t) => el('li', {}, el('span', { className: 'kind', textContent: `👀 Review · ${t.by}` }), el('a', { href: '#', textContent: t.title, onclick: (e) => { e.preventDefault(); openTask(t.id); } }), t.verification ? el('span', { className: 'm', textContent: `Verified: ${t.verification}` }) : null)),
+    ...r.messages.slice(-8).reverse().map((m) => el('li', {}, el('span', { className: 'kind', textContent: `${m.kind} · ${m.from}` }), el('span', { textContent: m.body }), el('span', { className: 'm', textContent: ago(m.at) }))),
+  ];
+  $('#inbox').replaceChildren(...(items.length ? items : [el('li', { className: 'empty', textContent: 'Nothing needs you.' })]));
+  $('#inbox-count').hidden = !r.count;
+  $('#inbox-count').textContent = String(r.count);
+}
+$('#inbox-count').addEventListener('click', () => act(() => api('/api/inbox')));
+$('#inbox-count').title = 'Mark messages as read';
+$('#mode-agents').addEventListener('change', (e) => act(() => api('/api/mode', { method: 'PATCH', body: { agentsOnly: e.target.checked } })));
+$('#lead').addEventListener('change', (e) => { if (e.target.value) act(() => api('/api/lead', { method: 'POST', body: { agent: e.target.value } })); });
+$('#goal-form').addEventListener('submit', (e) => {
+  e.preventDefault();
+  act(() => api('/api/goal', { method: 'PUT', body: { text: $('#goal-text').value.trim(), doneWhen: $('#goal-done').value.trim() } })).then(() => { $('#goal-edit').open = false; });
 });
 
 // ---- dreams -------------------------------------------------------------------------
