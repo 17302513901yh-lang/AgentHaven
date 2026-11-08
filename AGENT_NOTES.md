@@ -11,7 +11,7 @@
 - `src/connect.js` merges the MCP entry into Claude Desktop/Cursor/Windsurf/Gemini CLI JSON configs (backup, refuses invalid JSON) and the Codex TOML config (replaces only `[mcp_servers.agenthaven]`).
 - `src/server.js` acts as the agent named in `X-AgentHaven-Agent`, else as the human `you`. `/api/stream` is SSE (polls the workspace file mtime).
 - `desktop/main.js` Electron shell + electron-updater (GitHub Releases). `bin/agenthaven.js` CLI.
-- `docs/` = GitHub Pages site. All repo-facing text (README, site, UI, commits) is English.
+- `docs/` = GitHub Pages site (plain HTML/CSS/JS, no build). `docs/assets/dashboard.png|webp` is a real screenshot of the dashboard with a seeded demo workspace; `docs/assets/social.png` (1280x640) is the social preview, also used by README and `og:image`. Retake both when the UI changes visibly. All repo-facing text (README, site, UI, commits) is English.
 
 ## Commands
 - `npm run lint && npm test` (node:test, no Electron). Use `node --test` without a path; `node --test test/` fails on Node 22.
