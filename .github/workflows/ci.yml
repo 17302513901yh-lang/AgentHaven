@@ -47,6 +47,19 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      # electron and electron-builder download their tools on every build; keep them so a
+      # flaky download mirror cannot block a release.
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+            ~/AppData/Local/electron/Cache
+            ~/AppData/Local/electron-builder/Cache
+          key: electron-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: electron-${{ runner.os }}-
       # Signing is enabled automatically when the secrets below are set;
       # without them the build is unsigned (fine for testing, not for users).
       - name: Build installer
@@ -66,7 +79,7 @@ jobs:
           for try in 1 2 3; do
             npm run ${{ matrix.script }} -- $extra && break
             if [ "$try" = 3 ]; then exit 1; fi
-            echo "Build attempt $try failed; retrying in 30 s"; sleep 30
+            echo "Build attempt $try failed; retrying in $((try * 45)) s"; sleep $((try * 45))
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
