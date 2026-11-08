@@ -13,14 +13,22 @@ contributors; comment on the issue before you start.
 - [x] **Tool annotations**: read-only and destructive tools are marked, so clients ask less.
 - [x] **Compact, structured results**: about 30% fewer tokens, plus `structuredContent`.
 - [x] **One board name per session**: `claude-code` and `claude-code#2` no longer share claims.
-- [ ] The same hooks for Gemini CLI (an extension) and Codex.
+- [ ] The same hooks for Gemini CLI ([#21](https://github.com/laaielichter/AgentHaven/issues/21)) and Codex.
 - [ ] More one-click connects: Zed ([#9](https://github.com/laaielichter/AgentHaven/issues/9)) and VS Code / Copilot ([#12](https://github.com/laaielichter/AgentHaven/issues/12)).
+
+## Small things anyone can pick up
+
+- [ ] `agenthaven status` in the terminal ([#16](https://github.com/laaielichter/AgentHaven/issues/16))
+- [ ] `?` shows the dashboard's keyboard shortcuts ([#17](https://github.com/laaielichter/AgentHaven/issues/17))
+- [ ] A setup guide for Codex, Gemini CLI and Cursor ([#18](https://github.com/laaielichter/AgentHaven/issues/18))
+- [ ] `agenthaven tools` lists the tool profiles ([#19](https://github.com/laaielichter/AgentHaven/issues/19))
+- [ ] Guard: more API key formats ([#7](https://github.com/laaielichter/AgentHaven/issues/7))
 
 ## Phase 2: people in the loop (0.6)
 
 - [ ] **Approvals queue** in the dashboard: reviews, questions to humans, escalations, budgets and quarantined notes in one list, operated from the keyboard.
 - [ ] **Review with the diff**: the task's real git diff, the check receipt and the scope result side by side, with approve or send back.
-- [ ] **Notifications**: desktop notifications and a tray badge when an agent asks a human, a review is ready or a task escalates.
+- [ ] **Notifications** ([#20](https://github.com/laaielichter/AgentHaven/issues/20)): desktop notifications and a tray badge when an agent asks a human, a review is ready or a task escalates.
 - [ ] **Questions in the client** (MCP elicitation): a question for humans, or a budget raise, appears as a form in Claude, Cursor or VS Code.
 - [ ] **Live updates for agents**: the board as MCP resources with update notifications, so agents react to their inbox instead of polling.
 
@@ -30,7 +38,7 @@ contributors; comment on the issue before you start.
 - [ ] **Timeline** per agent and per task: claims, progress, handoffs and checks, to replay what happened.
 - [ ] **Automatic cost tracking**: a hook reports token use, with a cost view per agent, vendor and goal, and a budget for the whole goal.
 - [ ] **Playbooks**: one click turns "feature: plan → build → review → test" into subtasks with the right skills and order.
-- [ ] **Dependency graph** with the critical path.
+- [ ] **Dependency graph** with the critical path ([#22](https://github.com/laaielichter/AgentHaven/issues/22)).
 
 ## Later, if people need it
 
