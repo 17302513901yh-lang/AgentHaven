@@ -619,4 +619,103 @@ $('#share-unlink').addEventListener('click', async () => { try { showShare(await
 $('#share-copy').addEventListener('click', () => navigator.clipboard?.writeText($('#share-instr').value).then(() => { $('#share-copy').textContent = 'Copied'; setTimeout(() => { $('#share-copy').textContent = 'Copy instructions'; }, 1500); }));
 $('#share-cancel').addEventListener('click', () => $('#share-dialog').close());
 
+// ---- updates (desktop app only) ------------------------------------------------------
+
+const updates = window.agenthavenDesktop?.updates;
+let upd = null;
+let updHiddenFor = '';
+const mb = (n) => `${(n / 1048576).toFixed(n >= 10485760 ? 0 : 1)} MB`;
+
+function updateView(s) {
+  const v = s.version ? `AgentHaven ${s.version}` : 'AgentHaven';
+  if (s.status === 'downloading') {
+    const parts = [`${s.percent || 0}%`];
+    if (s.total) parts.push(`${mb(s.transferred)} of ${mb(s.total)}`);
+    if (s.bytesPerSecond) parts.push(`${mb(s.bytesPerSecond)}/s`);
+    return { title: `Downloading ${v}…`, detail: parts.join(' · '), progress: s.percent || 0 };
+  }
+  if (s.status === 'downloaded' && s.manualInstall) return { title: `${v} is downloaded`, detail: 'Open it, drag AgentHaven onto Applications and choose Replace. Your boards are kept.', action: 'Open and quit', ready: true };
+  if (s.status === 'downloaded') return { title: `${v} is ready to install`, detail: 'Restart to update. Your boards are kept; it also installs the next time you quit.', action: 'Restart and update', ready: true };
+  if (s.status === 'available') return { title: `${v} is available`, detail: s.manualInstall ? 'Download the new version to your Downloads folder and install it with one drag.' : 'A new version is available.', action: s.manualInstall ? 'Download' : 'Download and install' };
+  if (s.status === 'error' && (s.manualCheck || s.version)) return { title: 'Update failed', detail: s.error || '', action: 'Try again', error: true };
+  if (s.justUpdatedFrom) return { title: `Updated to AgentHaven ${s.currentVersion}`, detail: `You were on ${s.justUpdatedFrom}. See what changed in this version.`, action: 'OK', whatsNew: true, ready: true };
+  return null;
+}
+
+function updateAction(s) {
+  if (s.justUpdatedFrom && !['available', 'downloading', 'downloaded', 'error'].includes(s.status)) return updates.dismissWhatsNew();
+  if (s.status === 'downloaded') return updates.install();
+  if (s.status === 'available') return updates.download();
+  if (s.status === 'error') return updates.check();
+  return null;
+}
+
+function renderUpdates(s) {
+  upd = s;
+  if (!s || s.status === 'unsupported') return;
+  const view = updateView(s);
+  const key = `${s.status}:${s.version || s.justUpdatedFrom || ''}`;
+  const banner = $('#update-banner');
+  banner.hidden = !view || updHiddenFor === key;
+  if (view) {
+    banner.className = `update-banner${view.ready ? ' ready' : ''}${view.error ? ' error' : ''}`;
+    $('#update-icon').textContent = view.error ? '!' : view.ready ? '✓' : '⬆';
+    $('#update-title').textContent = view.title;
+    $('#update-detail').textContent = view.detail;
+    $('#update-progress').hidden = view.progress == null;
+    $('#update-bar').style.width = `${view.progress || 0}%`;
+    $('#update-action').hidden = !view.action;
+    $('#update-action').textContent = view.action || '';
+    $('#update-notes').hidden = !(s.notes || view.whatsNew);
+  }
+  const pending = ['available', 'downloading', 'downloaded'].includes(s.status);
+  const pill = $('#update-btn');
+  pill.hidden = false;
+  pill.classList.toggle('hot', pending);
+  pill.textContent = s.status === 'downloaded' ? '⬆ Restart to update' : s.status === 'downloading' ? `⬆ ${s.percent || 0}%` : pending ? `⬆ ${s.version}` : `v${s.currentVersion}`;
+  pill.title = pending ? `${view?.title || 'Update'}. Click for details.` : 'Version and updates';
+
+  $('#upd-current').textContent = `Installed: ${s.currentVersion}`;
+  $('#upd-status').textContent = view ? `${view.title}. ${view.detail}`
+    : s.status === 'checking' ? 'Checking for updates…'
+      : s.status === 'up-to-date' ? `You have the latest version.${s.checkedAt ? ` Checked ${ago(s.checkedAt)}.` : ''}`
+        : s.status === 'error' ? `Last check failed: ${s.error}` : 'Not checked yet.';
+  $('#upd-progress').hidden = s.status !== 'downloading';
+  $('#upd-bar').style.width = `${s.percent || 0}%`;
+  $('#upd-notes').hidden = !s.notes;
+  $('#upd-notes').textContent = s.notes ? `What's new in ${s.version}\n\n${s.notes}` : '';
+  $('#upd-mac').hidden = !(s.manualInstall && pending);
+  $('#upd-auto').checked = s.autoCheck;
+  $('#upd-skip').hidden = !(s.version && ['available', 'downloading', 'downloaded'].includes(s.status));
+  $('#upd-check').disabled = ['checking', 'downloading'].includes(s.status);
+  $('#upd-check').textContent = s.status === 'checking' ? 'Checking…' : 'Check now';
+  const act = pending && view?.action && !view.whatsNew;
+  $('#upd-action').hidden = !act;
+  $('#upd-action').textContent = act ? view.action : '';
+}
+
+async function updCall(fn) {
+  try { const s = await fn(); if (s && typeof s === 'object') renderUpdates(s); } catch (err) { showError(err); }
+}
+
+if (updates) {
+  updates.onState(renderUpdates);
+  updates.get().then(renderUpdates).catch(() => {});
+  $('#update-btn').addEventListener('click', () => { if (upd) renderUpdates(upd); $('#update-dialog').showModal(); });
+  $('#update-action').addEventListener('click', () => updCall(() => updateAction(upd)));
+  $('#upd-action').addEventListener('click', () => updCall(() => updateAction(upd)));
+  $('#update-later').addEventListener('click', () => {
+    updHiddenFor = `${upd.status}:${upd.version || upd.justUpdatedFrom || ''}`;
+    $('#update-banner').hidden = true;
+    if (upd.justUpdatedFrom && !upd.version) updCall(() => updates.dismissWhatsNew());
+  });
+  $('#update-notes').addEventListener('click', () => {
+    if (upd.notes) { renderUpdates(upd); $('#update-dialog').showModal(); } else updates.openReleases();
+  });
+  $('#upd-check').addEventListener('click', () => updCall(() => updates.check()));
+  $('#upd-skip').addEventListener('click', () => updCall(() => updates.skip()));
+  $('#upd-auto').addEventListener('change', (e) => updCall(() => updates.setAutoCheck(e.target.checked)));
+  $('#upd-releases').addEventListener('click', () => updates.openReleases());
+}
+
 loadWorkspaces().then(() => { connect(); return refresh(true); }).catch(showError);
