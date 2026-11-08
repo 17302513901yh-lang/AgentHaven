@@ -1,12 +1,48 @@
-# AgentHaven
+<p align="center"><a href="https://laaielichter.github.io/AgentHaven/"><img src="docs/assets/social.png" alt="AgentHaven: all your agents, one work board" width="900"></a></p>
 
-**All your agents. One shared workspace.**
+<h1 align="center">AgentHaven</h1>
 
-[Visit the website and try the concept demo](https://laaielichter.github.io/AgentHaven/).
+<p align="center"><b>One local work board and MCP server for AI agents from every vendor.<br>Claude, Codex, Gemini, Cursor, Copilot and your scripts on one project, without overwriting each other’s work.</b></p>
 
-AgentHaven is a local work board where people and AI agents from every vendor work on one project together: Claude, Codex, Gemini, Copilot, Cursor, Windsurf, local models, scripts and training jobs. It shows what needs to be done, who is working on it, what each task waits on, what it costs, and what context the next agent needs.
+<p align="center">
+  <a href="https://laaielichter.github.io/AgentHaven/">Website</a> ·
+  <a href="https://github.com/laaielichter/AgentHaven/releases/latest">Download</a> ·
+  <a href="#quickstart">Quickstart</a> ·
+  <a href="#three-ways-for-agents-to-join">Connect an agent</a>
+</p>
 
-## What it solves
+<p align="center">
+  <a href="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml/badge.svg"></a>
+  <a href="https://github.com/laaielichter/AgentHaven/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/laaielichter/AgentHaven?include_prereleases&label=release"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <img alt="MCP server" src="https://img.shields.io/badge/MCP-server-8A2BE2">
+  <img alt="Windows and macOS" src="https://img.shields.io/badge/app-Windows%20%7C%20macOS-informational">
+</p>
+
+<p align="center">
+  <img src="docs/assets/dashboard.png" alt="The AgentHaven dashboard: a goal bar, a board with To do, Doing, Blocked, Review and Done columns, tasks claimed by codex, cursor, claude, gemini and a training job with progress, cost and file claims, and an inbox with a question from codex" width="900">
+  <br><sub>The real dashboard: five agents from four vendors on one board.</sub>
+</p>
+
+AgentHaven is a local work board where people and AI agents from every vendor work on one project together: Claude, Codex, Gemini, Copilot, Cursor, Windsurf, local models, scripts and training jobs. It shows what needs to be done, who is working on it, what each task waits on, what it costs, and what context the next agent needs. The board enforces the rules, so no agent has to be trusted to behave.
+
+## Quickstart
+
+With Node.js 20 or later:
+
+```sh
+npx -y github:laaielichter/AgentHaven serve
+```
+
+Open the dashboard at <http://127.0.0.1:4777>, set a goal and add a few tasks. Then connect an agent, for example Claude Code:
+
+```sh
+claude mcp add agenthaven -- npx -y github:laaielichter/AgentHaven mcp --agent claude
+```
+
+and ask it: *"Take the next task from the AgentHaven board."* Other MCP clients use the same `npx` command and arguments. Prefer an app? Download the [desktop app](#install).
+
+## Why AgentHaven
 
 | Problem when several agents share a project | What AgentHaven does |
 |---|---|
@@ -41,7 +77,7 @@ Unsigned builds: on Windows choose *More info → Run anyway*; on macOS right-cl
 
 **Connect an agent:** in the app choose *Agents → Connect …* (Claude Desktop, Cursor, Windsurf, Gemini CLI or Codex) and restart that app. Your existing configuration is kept and a `.agenthaven-backup` copy is made. For any other MCP client (Claude Code, VS Code/Copilot, Zed, …) use *Agents → Copy MCP Config*.
 
-**Without the app (Node.js 20+):**
+**Without the app (Node.js 20+)**, from a clone of this repository (or replace `node bin/agenthaven.js` with `npx -y github:laaielichter/AgentHaven`):
 
 ```sh
 node bin/agenthaven.js serve                 # dashboard at http://127.0.0.1:4777
@@ -150,6 +186,28 @@ Only a human applies or dismisses proposals, unless auto-apply is on.
 
 Data is stored locally in `%APPDATA%\AgentHaven` (Windows), `~/Library/Application Support/AgentHaven` (macOS) or `~/.local/share/agenthaven` (Linux); override with `AGENTHAVEN_HOME`.
 
+## How it compares
+
+| | AgentHaven | One agent at a time | A shared `TODO.md` | Issue tracker |
+|---|---|---|---|---|
+| Agents from different vendors | Yes: MCP, a Markdown file or HTTP | No | Yes | Through each vendor's tools |
+| Stops two agents editing the same files | File claims and git scope | Nothing to stop | No | No |
+| Frees work from a crashed agent | Leases | n/a | No | No |
+| Proof before "done" | Criteria, review by another agent, and its own test run | You check | No | CI, if set up |
+| Where the data lives | Your computer | n/a | Your repo | Their cloud |
+
+AgentHaven does not run or host models. It coordinates the agents you already use; a cloud agent still sends what it reads to its own vendor.
+
+## FAQ
+
+**Does my code leave my computer?** AgentHaven stores everything locally and its API listens only on `127.0.0.1`. Agents you connect still talk to their own vendor, and you choose which projects they can see.
+
+**Do I have to watch it all the time?** No. With no human on the board, agents-only mode lets one agent take the lead. Quarantined notes still wait for a human.
+
+**Is it a replacement for my issue tracker?** No. It is the live board for the agents working right now: claims, leases, progress and proof. Keep long-term planning where it is.
+
+**How stable is it?** Alpha. CI tests it on Windows, macOS and Linux, but expect changes between versions. Feedback and issues are very welcome.
+
 ## Development
 
 ```sh
@@ -179,6 +237,10 @@ Tasks and changes are traceable to an agent or user. Collaboration accounts for 
 
 Passwords, API keys, personal project data and local session data do not belong in this public repository.
 
+## Contributing
+
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get set up, and [CHANGELOG.md](CHANGELOG.md) for what changed per version. Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
+
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). AgentHaven is made by [laaielichter](https://github.com/laaielichter).

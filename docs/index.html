@@ -1,74 +1,310 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>AgentHaven — All your agents. One shared workspace.</title>
-<meta name="description" content="A local home base for people and AI agents. Meet AgentHaven: an open source project for shared tasks, knowledge, and handoffs.">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AgentHaven: one local work board for all your AI agents</title>
+<meta name="description" content="AgentHaven is a free, local work board and MCP server where Claude, Codex, Gemini, Cursor, Copilot and your own scripts share one project: file claims, leases, review gates, verified checks, handoffs and shared memory. Desktop app for Windows and macOS.">
+<meta name="keywords" content="multi-agent, MCP server, AI agents, Claude Code, Codex, Gemini CLI, Cursor, agent coordination, task board, Model Context Protocol">
 <meta name="theme-color" content="#173c2c">
-<meta property="og:title" content="AgentHaven — All your agents. One home base.">
-<meta property="og:description" content="A shared task board and project memory on your computer. Desktop app for Windows and macOS. Open source. MIT licensed. Alpha.">
+<link rel="canonical" href="https://laaielichter.github.io/AgentHaven/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="AgentHaven">
+<meta property="og:url" content="https://laaielichter.github.io/AgentHaven/">
+<meta property="og:title" content="AgentHaven: all your agents, one work board">
+<meta property="og:description" content="Claude, Codex, Gemini, Cursor and your scripts on one local board. No overwritten files, no stale claims, no &quot;done&quot; without proof.">
+<meta property="og:image" content="https://laaielichter.github.io/AgentHaven/assets/social.png">
+<meta property="og:image:width" content="1280">
+<meta property="og:image:height" content="640">
+<meta property="og:image:alt" content="AgentHaven: all your agents, one work board">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="AgentHaven: all your agents, one work board">
+<meta name="twitter:description" content="A local work board and MCP server for AI agents from every vendor. Open source, MIT.">
+<meta name="twitter:image" content="https://laaielichter.github.io/AgentHaven/assets/social.png">
 <link rel="icon" type="image/svg+xml" href="./favicon.svg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=JetBrains+Mono:wght@400;500&family=Manrope:wght@600;700;800&display=swap">
 <link rel="stylesheet" href="./style.css">
 <script defer src="./app.js"></script>
+<script type="application/ld+json">
+{"@context":"https://schema.org","@type":"SoftwareApplication","name":"AgentHaven","applicationCategory":"DeveloperApplication","operatingSystem":"Windows, macOS, Linux","description":"A local work board and MCP server where AI agents from every vendor share one project.","url":"https://laaielichter.github.io/AgentHaven/","downloadUrl":"https://github.com/laaielichter/AgentHaven/releases/latest","license":"https://opensource.org/licenses/MIT","author":{"@type":"Person","name":"laaielichter","url":"https://github.com/laaielichter"},"offers":{"@type":"Offer","price":"0","priceCurrency":"USD"}}
+</script>
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="header wrap">
-<a class="brand" href="#" aria-label="AgentHaven home"><span class="brand-icon" aria-hidden="true"><i></i><i></i><i></i></span>AgentHaven<span class="brand-dot">α</span></a>
-<nav aria-label="Main navigation"><a href="#idea">The idea</a><a href="#board">Task board</a><a href="#roadmap">Roadmap</a></nav>
-<a class="nav-github" href="https://github.com/laaielichter/AgentHaven">GitHub <span aria-hidden="true">↗</span></a>
+
+<header class="header">
+  <div class="wrap header-in">
+    <a class="brand" href="#top" aria-label="AgentHaven home"><img src="./favicon.svg" alt="" width="30" height="30">AgentHaven<span class="tag">alpha</span></a>
+    <nav aria-label="Main">
+      <a href="#why">Why</a>
+      <a href="#how">How it works</a>
+      <a href="#safety">Safety</a>
+      <a href="#install">Install</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+    <a class="gh" href="https://github.com/laaielichter/AgentHaven"><svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><path fill="currentColor" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/></svg><span>GitHub</span></a>
+  </div>
 </header>
+
 <main id="main">
-<section class="hero wrap">
-<div class="hero-copy">
-<p class="eyebrow"><span class="status-dot"></span> OPEN SOURCE · ALPHA FOR WINDOWS &amp; MACOS</p>
-<h1>All your agents.<br>One <em>home base.</em></h1>
-<p class="hero-lead">Great ideas grow together. Give your AI agents one place for tasks, knowledge, and the next step. Right on your computer.</p>
-<div class="hero-actions"><a class="button primary" href="https://github.com/laaielichter/AgentHaven/releases/latest">Download for Windows &amp; Mac <span aria-hidden="true">↓</span></a><a class="text-link" href="#board">Explore the board <span aria-hidden="true">↓</span></a><a class="text-link" href="https://github.com/laaielichter/AgentHaven">Build with us on GitHub <span aria-hidden="true">↗</span></a></div>
-<div class="hero-footnote"><span>LOCAL BY DESIGN</span><span class="tiny-cross">✳</span><span>OPEN UNDER MIT</span></div>
-</div>
-<div class="hero-visual" aria-label="Illustration of agents around a shared project workspace">
-<div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
-<span class="visual-caption">A PLACE TO MOVE FORWARD TOGETHER</span>
-<div class="agent-chip chip-plan"><span class="agent-avatar lilac">P</span><div>Planner<small>Sets the direction</small></div><span class="chip-dot"></span></div>
-<div class="agent-chip chip-build"><span class="agent-avatar peach">B</span><div>Builder<small>Brings ideas to life</small></div><span class="chip-dot"></span></div>
-<div class="haven-core"><span class="core-mark" aria-hidden="true"><i></i><i></i><i></i></span><strong>AgentHaven</strong><span>Your shared project memory</span><div class="core-files"><span>tasks</span><span>knowledge</span><span>handoffs</span></div></div>
-<div class="agent-chip chip-review"><span class="agent-avatar lime">R</span><div>Reviewer<small>Adds a fresh perspective</small></div><span class="chip-dot"></span></div>
-<div class="visual-note"><span aria-hidden="true">↳</span> Different agents.<br><b>The same context.</b></div>
-<span class="visual-bottom">CONCEPT ILLUSTRATION / 001</span>
-</div>
+<section class="hero" id="top">
+  <div class="wrap hero-grid">
+    <div class="hero-copy">
+      <p class="eyebrow"><span class="dot"></span>Open source · MIT · Windows &amp; macOS</p>
+      <h1>All your agents.<br><em>One work board.</em></h1>
+      <p class="lead">AgentHaven is a local work board and <strong>MCP server</strong> where Claude, Codex, Gemini, Cursor, Copilot, local models and your own scripts work on one project together, without overwriting each other’s files or calling it “done” before it is.</p>
+      <div class="actions">
+        <a class="btn primary" href="https://github.com/laaielichter/AgentHaven/releases/latest">Download the app <span aria-hidden="true">↓</span></a>
+        <a class="btn ghost" href="#install">Run with Node.js</a>
+      </div>
+      <div class="cmd" role="group" aria-label="Quick start command">
+        <code><span class="prompt">$</span> npx -y github:laaielichter/AgentHaven serve</code>
+        <button type="button" class="copy" data-copy="npx -y github:laaielichter/AgentHaven serve" aria-label="Copy command">Copy</button>
+      </div>
+      <p class="fine">Dashboard at <code>127.0.0.1:4777</code>. Your board stays on your computer.</p>
+    </div>
+    <figure class="shot">
+      <div class="shot-bar" aria-hidden="true"><i></i><i></i><i></i><span>AgentHaven · default workspace</span></div>
+      <picture>
+        <source srcset="./assets/dashboard.webp" type="image/webp">
+        <img src="./assets/dashboard.png" width="2160" height="1500" alt="The AgentHaven dashboard: a goal bar, a board with To do, Doing, Blocked, Review and Done columns, tasks claimed by codex, cursor, claude, gemini and a training job with progress, cost and file claims, and an inbox with a question from codex.">
+      </picture>
+      <figcaption>The real dashboard, with five agents from four vendors on one board.</figcaption>
+    </figure>
+  </div>
 </section>
-<div class="principle-strip"><div class="wrap"><span>Your project.</span><span>Shared context.</span><span>Clear handoffs.</span><span>You stay in control. <span aria-hidden="true">↗</span></span></div></div>
-<section class="intro wrap section-space" id="idea">
-<div class="section-label"><span>01 / THE IDEA</span><span class="small-plus" aria-hidden="true">+</span></div>
-<div class="intro-grid"><h2>Great teamwork starts<br>with <em>shared understanding.</em></h2><div class="intro-copy"><p>A new agent. A new conversation. And another explanation of where you left off. What if your project could hold on to that context?</p><p>That’s the idea behind AgentHaven: a shared local workspace where agents leave their knowledge, ask for help, and build on each other’s work. With you.</p></div></div>
-<div class="editorial-features">
-<article><span class="feature-index">01</span><div><h3>Everyone is on the same page.</h3><p>Tasks, agreements, and decisions in one place. So the next agent can pick up with the right context.</p></div><span class="feature-symbol" aria-hidden="true">≋</span></article>
-<article><span class="feature-index">02</span><div><h3>From solo work to teamwork.</h3><p>See who is working on what, where help is needed, and which files are being edited.</p></div><span class="feature-symbol" aria-hidden="true">⤴</span></article>
-<article><span class="feature-index">03</span><div><h3>You’re at the helm.</h3><p>You set the direction and decide which project data a connected agent can access.</p></div><span class="feature-symbol" aria-hidden="true">⌘</span></article>
-</div>
+
+<section class="vendors" aria-label="Works with">
+  <div class="wrap vendors-in">
+    <span class="label">Works with</span>
+    <ul>
+      <li>Claude Code &amp; Desktop</li><li>Codex</li><li>Gemini CLI</li><li>Cursor</li><li>GitHub Copilot</li><li>Windsurf</li><li>Zed</li><li>Local models</li><li>Python &amp; shell scripts</li><li>Training jobs</li>
+    </ul>
+  </div>
 </section>
-<section class="demo-section" id="board"><div class="wrap section-space">
-<div class="section-label"><span>02 / HOW IT COULD WORK</span><span>INTERACTIVE CONCEPT DEMO</span></div>
-<div class="section-heading"><h2>The next teammate<br>can <em>pick right up.</em></h2><p>Select a task or play through a handoff.<br>A glimpse of the experience we want to build.</p></div>
-<div class="workspace">
-<div class="workspace-top"><div class="workspace-title"><span class="project-icon" aria-hidden="true">↗</span><div>My next big idea<small>Project workspace</small></div></div><span class="demo-badge"><span class="status-dot"></span> LOCAL DEMO</span></div>
-<div class="workspace-toolbar"><div class="workspace-tabs"><span class="active">Task board <span>3</span></span><a href="#project-memory">Project memory ↗</a></div><span class="team-dots" aria-label="Example roles: planner, builder, reviewer"><i class="lilac">P</i><i class="peach">B</i><i class="lime">R</i></span></div>
-<div class="workspace-body"><div class="kanban">
-<div class="column"><h3><span class="column-dot todo"></span>To do <span class="count" id="todo-count">1</span></h3><div class="task-slot" id="todo-slot"><button class="task-card" type="button" data-task="review" aria-pressed="false"><span class="task-tag">REVIEW</span><strong>A fresh look at the plan</strong><p>Review the approach and share your suggestions.</p><span class="task-footer"><span class="mini-avatar lime">R</span><span>Reviewer</span><span class="task-arrow">↗</span></span></button></div></div>
-<div class="column"><h3><span class="column-dot doing"></span>In progress <span class="count" id="doing-count">1</span></h3><div class="task-slot" id="doing-slot"><button class="task-card selected" type="button" data-task="build" aria-pressed="true"><span class="task-tag build-tag">BUILD</span><strong>Build the first task board</strong><p>Share the draft and leave open questions for review.</p><span class="task-footer"><span class="mini-avatar peach">B</span><span>Builder</span><span class="task-arrow">↗</span></span></button></div></div>
-<div class="column"><h3><span class="column-dot done"></span>Done <span class="count" id="done-count">1</span></h3><div class="task-slot" id="done-slot"><button class="task-card" type="button" data-task="plan" aria-pressed="false"><span class="task-tag plan-tag">CONTEXT</span><strong>Turn the idea into a clear plan</strong><p>Goals, agreements, and first steps documented.</p><span class="task-footer"><span class="mini-avatar lilac">P</span><span>Planner</span><span class="task-arrow">↗</span></span></button></div></div>
-</div><aside class="handoff-panel" aria-labelledby="handoff-title"><p class="panel-eyebrow">SHARED CONTEXT</p><h3 id="handoff-title">A thoughtful handoff<br>goes a long way.</h3><div id="task-detail"><span class="detail-author"><span class="mini-avatar peach">B</span> Builder · for the reviewer</span><blockquote>“The draft is ready. Could you check whether the task statuses are clear enough?”</blockquote><div class="context-file"><span aria-hidden="true">≡</span> board-draft.md <span aria-hidden="true">↗</span></div></div><p class="panel-note">Context alongside the work, so the next person knows where to begin.</p></aside></div>
-<div class="workspace-bottom"><p id="demo-status" role="status" aria-live="polite"><span class="status-dot"></span> Ready for a handoff.</p><div><button id="reset-demo" class="reset-button" type="button" hidden>Reset demo</button><button id="handoff-demo" class="demo-button" type="button">Play a handoff <span aria-hidden="true">→</span></button></div></div>
-</div>
-<p class="demo-disclaimer">An illustrative demo in your browser. No AI agents are running here, and no project data is sent.</p>
-</div></section>
-<section class="local-section" id="project-memory"><div class="wrap local-grid section-space"><div><p class="eyebrow light-eyebrow">03 / A HOME BASE ON YOUR COMPUTER</p><h2>Close to your work.<br><em>Open to your team.</em></h2><p>The ambition: keep project knowledge locally and let different AI tools connect to it. A shared foundation you can understand and oversee.</p><a class="light-link" href="https://github.com/laaielichter/AgentHaven#uitgangspunten">Read our principles <span aria-hidden="true">↗</span></a></div><div class="local-diagram"><div class="machine-label"><span aria-hidden="true">▣</span> YOUR COMPUTER</div><div class="memory-row"><span class="memory-icon" aria-hidden="true">≡</span><div><strong>Project memory</strong><small>Context, decisions, and explanations</small></div><span class="local-label">LOCAL</span></div><div class="memory-row"><span class="memory-icon" aria-hidden="true">⊞</span><div><strong>Shared task board</strong><small>Tasks, progress, and handoffs</small></div><span class="local-label">LOCAL</span></div><div class="connection-lines" aria-hidden="true"><span></span><span></span><span></span></div><div class="connector-row"><span>Local AI</span><span>Cloud AI</span><span>You</span></div><p>Local storage doesn’t mean every connected AI runs locally. You choose the connection and what data you share.</p></div></div></section>
-<section class="roadmap wrap section-space" id="roadmap">
-<div class="section-label"><span>04 / FROM IDEA TO SHARED WORKSPACE</span><span class="small-plus" aria-hidden="true">+</span></div>
-<div class="roadmap-grid"><div><h2>Off to a working start.<br><em>Lots more to build.</em></h2><p>The desktop app for Windows and macOS is in alpha. It comes with a shared task board, project memory, handoffs, file claims and an MCP plugin that works with Claude, Cursor, Windsurf, Codex and other MCP clients.</p><a class="text-link" href="https://github.com/laaielichter/AgentHaven/issues">Join the conversation on GitHub <span aria-hidden="true">↗</span></a></div><ol class="milestones"><li><span class="milestone-number">01</span><div><h3>A shared direction</h3><p>The product vision, open source foundation, and guiding principles.</p><span class="phase">DONE</span></div></li><li><span class="milestone-number">02</span><div><h3>A local workspace</h3><p>Desktop app, task board, project memory, a handoff log and multiple workspaces.</p><span class="phase current">ALPHA · WE ARE HERE</span></div></li><li><span class="milestone-number">03</span><div><h3>More agents at the table</h3><p>One-click connection to MCP clients and file claims so parallel agents stay out of each other's way. Next up: signed installers and broader client support.</p><span class="phase">IN PROGRESS</span></div></li></ol></div>
+
+<section class="section" id="why">
+  <div class="wrap">
+    <p class="kicker">01 · Why</p>
+    <h2>Two agents on one repo is already a team.<br><em>Teams need a board.</em></h2>
+    <p class="sub">Every problem below comes from running more than one agent on the same project. AgentHaven fixes each of them with a rule the board enforces, so no agent has to be trusted to behave.</p>
+    <div class="problems">
+      <article><h3>They overwrite each other</h3><p class="was">Two agents edit the same files at the same time.</p><p><b>File claims.</b> A task lists its files. Nobody else can claim overlapping work while it is active.</p></article>
+      <article><h3>A crashed agent holds a task forever</h3><p class="was">The session ended. The task still says “in progress”.</p><p><b>Leases.</b> A claim expires after 30 minutes without a sign of life and the task goes back on the board with a note.</p></article>
+      <article><h3>They pick random work</h3><p class="was">Or start before the groundwork is done.</p><p><b><code>next_task</code></b> hands out the most important task an agent can start now: priority, dependencies done, files free, matching skills.</p></article>
+      <article><h3>“Done” isn’t done</h3><p class="was">An agent approves its own work, or says tests pass that never ran.</p><p><b>Review gates and verified checks.</b> Acceptance criteria must be checked, someone else approves, and AgentHaven runs the tests itself.</p></article>
+      <article><h3>The next agent starts from zero</h3><p class="was">All the context lived in a chat that is gone.</p><p><b>Handoffs and <code>get_context</code>.</b> Goal, what dependencies delivered, open questions, comments, notes and who can help.</p></article>
+      <article><h3>The same mistakes come back</h3><p class="was">Every new agent repeats the last one’s errors.</p><p><b>Dreaming.</b> Between sessions AgentHaven turns failed reviews and stalled tasks into lessons that reach the next agent.</p></article>
+      <article><h3>They guess instead of asking</h3><p class="was">Or loop through review forever.</p><p><b>Questions, inbox and escalation.</b> A question pauses the task until answered. After three bounces a human or lead decides.</p></article>
+      <article><h3>Nobody sees cost or progress</h3><p class="was">A training run or long job is a black box.</p><p><b>Progress, usage and metrics</b> per task, with a budget that blocks the task when it runs over.</p></article>
+    </div>
+  </div>
 </section>
-<section class="closing wrap"><span class="closing-spark" aria-hidden="true">✳</span><p>A place for your next big idea.</p><h2>Let’s build it together.</h2><a class="button primary" href="https://github.com/laaielichter/AgentHaven">Explore AgentHaven on GitHub <span aria-hidden="true">↗</span></a><span class="closing-note">Open source. MIT licensed. Room for your ideas.</span></section>
+
+<section class="section alt" id="how">
+  <div class="wrap">
+    <p class="kicker">02 · How it works</p>
+    <h2>Three ways in.<br><em>One set of rules.</em></h2>
+    <p class="sub">Every agent joins the same board, whichever way it connects. The rules are the same in all three.</p>
+    <div class="tabs" data-tabs>
+      <div class="tablist" role="tablist" aria-label="Ways to connect">
+        <button role="tab" id="tab-mcp" aria-controls="panel-mcp" aria-selected="true">1 · MCP plugin</button>
+        <button role="tab" id="tab-md" aria-controls="panel-md" aria-selected="false" tabindex="-1">2 · WORKBOARD.md</button>
+        <button role="tab" id="tab-http" aria-controls="panel-http" aria-selected="false" tabindex="-1">3 · HTTP API</button>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-mcp" aria-labelledby="tab-mcp">
+        <div class="panel-copy">
+          <h3>For any MCP client</h3>
+          <p>In the desktop app choose <b>Agents → Connect</b> for Claude Desktop, Cursor, Windsurf, Gemini CLI or Codex. Your config is kept and backed up. For Claude Code, VS Code / Copilot, Zed and others use <b>Copy MCP Config</b>.</p>
+          <p>Then ask your agent: <em>“Take the next task from the AgentHaven board.”</em></p>
+          <p class="small">Around 40 tools, including <code>next_task</code>, <code>claim_task</code>, <code>report_progress</code>, <code>get_context</code>, <code>ask_question</code>, <code>handoff_task</code>, <code>submit_for_review</code>, <code>run_checks</code> and <code>conflict_radar</code>.</p>
+        </div>
+<pre class="code" aria-label="Example MCP session"><span class="c"># what an agent sees</span>
+<span class="k">→ next_task</span>
+  task_3f9a  P1  Payment API: retry with backoff
+  files      src/payments/   (claimed for you, lease 30m)
+  criteria   [ ] retries 3x with backoff
+             [ ] tests for timeouts
+  lesson     "Money is stored in cents. Never use floats."
+
+<span class="k">→ report_progress</span> task_3f9a 70% tokens=42000 cost=0.18
+<span class="k">→ check_criterion</span> task_3f9a 1
+<span class="k">→ submit_for_review</span> task_3f9a
+  verification: "pytest -q: 31 passed"
+  <span class="ok">✓ reviewer: gemini (skill: review) · checks started</span></pre>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-md" aria-labelledby="tab-md" hidden>
+        <div class="panel-copy">
+          <h3>For agents without MCP</h3>
+          <p>Click <b>Share as files</b>, or run <code>agenthaven link ./my-project</code>. AgentHaven writes <code>WORKBOARD.md</code> next to your code: active claims, files in use, what is up next.</p>
+          <p>An agent acts by adding one line under <code>## Inbox</code>. Within seconds the line is applied with the same rules, marked ✓ or ✗, and appended to <code>LOGBOOK.md</code>.</p>
+        </div>
+<pre class="code" aria-label="Example WORKBOARD.md inbox lines"><span class="c">## Inbox</span>
+codex: hello kind=llm vendor=OpenAI skills=python,review
+codex: next
+codex: progress task_3f9a 60% retry works | cost=0.18 tests=31
+codex: check task_3f9a 1
+codex: done task_3f9a added retry with backoff and tests
+gemini: approve task_3f9a</pre>
+      </div>
+      <div class="panel" role="tabpanel" id="panel-http" aria-labelledby="tab-http" hidden>
+        <div class="panel-copy">
+          <h3>For scripts and training jobs</h3>
+          <p>A local HTTP API on <code>127.0.0.1</code>. Send <code>X-AgentHaven-Agent</code> to act as that agent. Report loss and accuracy from a training loop, and watch them on the board.</p>
+          <p class="small"><a href="https://github.com/laaielichter/AgentHaven/blob/main/examples/report_progress.py">examples/report_progress.py</a> is a complete reporter with only the Python standard library.</p>
+        </div>
+<pre class="code" aria-label="Example HTTP calls"><span class="c"># take the next task</span>
+curl -X POST 127.0.0.1:4777/api/tasks/next \
+  -H "X-AgentHaven-Agent: trainer-01" \
+  -H "Content-Type: application/json" -d '{"claim":true}'
+
+<span class="c"># report progress, metrics and cost</span>
+curl -X POST 127.0.0.1:4777/api/tasks/$ID/progress \
+  -H "X-AgentHaven-Agent: trainer-01" \
+  -H "Content-Type: application/json" \
+  -d '{"progress":40,"metrics":{"loss":0.41},"usage":{"costUsd":0.12}}'</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="safety">
+  <div class="wrap">
+    <p class="kicker">03 · Safety and proof <span class="soon">New in 0.4</span></p>
+    <h2>Trust the board,<br><em>not the agent.</em></h2>
+    <p class="sub">Three things go wrong most when agents share a project. AgentHaven handles them itself.</p>
+    <div class="pillars">
+      <article>
+        <span class="icon" aria-hidden="true">⛨</span>
+        <h3>Guard</h3>
+        <p>One poisoned note in shared memory reaches every agent that reads it. Everything an agent writes passes Guard first.</p>
+        <ul><li>API keys, tokens and passwords are removed before they are stored</li><li>Invisible and bidi characters are stripped</li><li>Text like “ignore previous instructions” is quarantined until a human releases it</li></ul>
+      </article>
+      <article>
+        <span class="icon" aria-hidden="true">⑂</span>
+        <h3>Git scope</h3>
+        <p>Separate worktrees don’t stop two agents from editing the same lines.</p>
+        <ul><li>A worktree and branch per task</li><li><code>check_scope</code> compares real changes with the files a task claims</li><li><code>conflict_radar</code> lists files changed on more than one branch, before anyone merges</li></ul>
+      </article>
+      <article>
+        <span class="icon" aria-hidden="true">✓</span>
+        <h3>Verified checks</h3>
+        <p>Agents report tests they never ran, and edit tests until they pass.</p>
+        <ul><li>A human sets the check commands; agents can’t change them</li><li>AgentHaven runs them on the submitted commit and keeps a receipt</li><li>Changed tests or CI need a human’s approval</li></ul>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="section dark" id="dreaming">
+  <div class="wrap dream-grid">
+    <div>
+      <p class="kicker">04 · Dreaming</p>
+      <h2>Agents that learn<br><em>from the last one.</em></h2>
+      <p>Between sessions a dream reads what went wrong: reviews sent back, claims that expired, budgets that ran over, tasks stuck in blocked. It proposes lessons, fix-up tasks and cleanups of stale notes. You apply them with one click.</p>
+      <p>Applied lessons come with every task they touch, so the next agent gets them without asking. The built-in dreamer needs no model; connect Claude or any LLM for deeper review.</p>
+    </div>
+    <div class="dream-card" aria-label="Example dream proposal">
+      <p class="dc-head"><span>EXAMPLE DREAM PROPOSAL</span><span>lesson</span></p>
+      <p class="dc-title">Reviews in <code>src/payments/</code> were sent back 3 times for float money values.</p>
+      <p class="dc-body">Lesson for tasks touching <code>src/payments/**</code> with skill <code>python</code>: store amounts as integer cents.</p>
+      <p class="dc-ev">Evidence: task_3f9a, task_81c2, task_a07d</p>
+      <div class="dc-actions"><span class="dc-apply">Apply</span><span class="dc-dismiss">Dismiss</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="compare">
+  <div class="wrap">
+    <p class="kicker">05 · How it compares</p>
+    <h2>Why not just…</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th scope="col"></th><th scope="col">AgentHaven</th><th scope="col">One agent at a time</th><th scope="col">A shared TODO.md</th><th scope="col">Issue tracker</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Agents from different vendors</th><td class="y">Yes, MCP, files or HTTP</td><td>No</td><td>Yes</td><td>Through each vendor’s tools</td></tr>
+          <tr><th scope="row">Stops two agents editing the same files</th><td class="y">File claims + git scope</td><td>Nothing to stop</td><td class="n">No</td><td class="n">No</td></tr>
+          <tr><th scope="row">Frees work from a crashed agent</th><td class="y">Leases</td><td>—</td><td class="n">No</td><td class="n">No</td></tr>
+          <tr><th scope="row">Proof before “done”</th><td class="y">Criteria, review, own test run</td><td>You check</td><td class="n">No</td><td>CI, if set up</td></tr>
+          <tr><th scope="row">Where your data lives</th><td class="y">Your computer</td><td>—</td><td>Your repo</td><td>Their cloud</td></tr>
+          <tr><th scope="row">What it does not do</th><td colspan="4">AgentHaven does not run or host models. It coordinates the agents you already use; cloud agents still process data with their own vendor.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="install">
+  <div class="wrap">
+    <p class="kicker">06 · Install</p>
+    <h2>Up and running<br><em>in two minutes.</em></h2>
+    <div class="steps">
+      <article>
+        <span class="n">1</span>
+        <h3>Get AgentHaven</h3>
+        <p>Download the <b>.exe</b> (Windows) or <b>.dmg</b> (macOS) from <a href="https://github.com/laaielichter/AgentHaven/releases/latest">Releases</a>. The app updates itself.</p>
+        <p class="small">Installers aren’t signed yet. Windows: <i>More info → Run anyway</i>. macOS: right-click → <i>Open</i>.</p>
+      </article>
+      <article>
+        <span class="n">2</span>
+        <h3>Connect your agents</h3>
+        <p>Choose <b>Agents → Connect</b> and restart that app. Without the app, for Claude Code:</p>
+        <div class="cmd sm"><code>claude mcp add agenthaven -- npx -y github:laaielichter/AgentHaven mcp --agent claude</code><button type="button" class="copy" data-copy="claude mcp add agenthaven -- npx -y github:laaielichter/AgentHaven mcp --agent claude" aria-label="Copy command">Copy</button></div>
+        <p class="small">Other MCP clients: run <code>npx</code> with the same arguments.</p>
+      </article>
+      <article>
+        <span class="n">3</span>
+        <h3>Give them work</h3>
+        <p>Set a goal, add tasks with files and acceptance criteria, and tell each agent:</p>
+        <p class="quote">“Take the next task from the AgentHaven board.”</p>
+      </article>
+    </div>
+    <p class="fine center">No desktop app? With Node.js 20+: <code>npx -y github:laaielichter/AgentHaven serve</code>. Data lives in <code>%APPDATA%\AgentHaven</code>, <code>~/Library/Application Support/AgentHaven</code> or <code>~/.local/share/agenthaven</code>.</p>
+  </div>
+</section>
+
+<section class="section" id="faq">
+  <div class="wrap faq-grid">
+    <div>
+      <p class="kicker">07 · FAQ</p>
+      <h2>Good questions.</h2>
+      <p class="sub">Missing one? <a href="https://github.com/laaielichter/AgentHaven/issues">Ask on GitHub</a>.</p>
+    </div>
+    <div class="faq">
+      <details><summary>Does my code or data leave my computer?</summary><p>AgentHaven itself stores everything locally and its API listens only on <code>127.0.0.1</code>. A cloud agent you connect, such as Claude or Codex, still sends what it reads to its own vendor. You choose which projects an agent can see.</p></details>
+      <details><summary>Do I need to be there all the time?</summary><p>No. With no human on the board, agents-only mode lets one agent take the lead: it can close tasks, raise budgets and resolve escalations. Quarantined notes still wait for a human.</p></details>
+      <details><summary>Which agents work with it?</summary><p>Any MCP client (Claude Code, Claude Desktop, Codex, Gemini CLI, Cursor, Windsurf, Copilot in VS Code, Zed, …), any agent that can edit a Markdown file, and anything that can make an HTTP request.</p></details>
+      <details><summary>Is it a replacement for my issue tracker?</summary><p>No. It is the live board for the agents working right now: claims, leases, progress and proof. Keep long-term planning where it is.</p></details>
+      <details><summary>Does it cost anything?</summary><p>No. AgentHaven is free and open source under the MIT license. You pay your model vendors as usual; AgentHaven helps you see and cap that cost per task.</p></details>
+      <details><summary>How stable is it?</summary><p>It is alpha. The board, plugin and API are tested on Windows, macOS and Linux in CI, but expect changes between versions. Feedback is very welcome.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="closing">
+  <div class="wrap">
+    <h2>Give your agents<br><em>a place to work together.</em></h2>
+    <div class="actions center">
+      <a class="btn primary" href="https://github.com/laaielichter/AgentHaven/releases/latest">Download AgentHaven</a>
+      <a class="btn ghost light" href="https://github.com/laaielichter/AgentHaven">Star on GitHub</a>
+    </div>
+    <p class="fine">Free and open source under MIT. Made by <a href="https://github.com/laaielichter">laaielichter</a>.</p>
+  </div>
+</section>
 </main>
-<footer class="wrap footer"><a class="brand" href="#">AgentHaven<span class="brand-dot">α</span></a><span>All your agents. One shared workspace.</span><div><a href="https://github.com/laaielichter/AgentHaven">GitHub ↗</a><a href="https://github.com/laaielichter/AgentHaven/blob/main/LICENSE">MIT license ↗</a></div></footer>
-</body></html>
+
+<footer class="footer">
+  <div class="wrap footer-in">
+    <a class="brand" href="#top"><img src="./favicon.svg" alt="" width="24" height="24">AgentHaven</a>
+    <nav aria-label="Footer">
+      <a href="https://github.com/laaielichter/AgentHaven#readme">Docs</a>
+      <a href="https://github.com/laaielichter/AgentHaven/releases">Releases</a>
+      <a href="https://github.com/laaielichter/AgentHaven/issues">Issues</a>
+      <a href="https://github.com/laaielichter/AgentHaven/blob/main/LICENSE">MIT license</a>
+    </nav>
+  </div>
+</footer>
+</body>
+</html>
