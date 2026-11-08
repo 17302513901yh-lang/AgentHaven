@@ -327,7 +327,11 @@ function createHandler({
     }
   }
   // Frees the board name when the session ends, so a new session gets it back.
-  handle.close = () => { if (claimed) { try { store.releaseIdentity({ name: actor, session }); } catch { /* best effort */ } } };
+  handle.close = () => {
+    if (!claimed) return;
+    claimed = false;
+    try { store.releaseIdentity({ name: actor, session }); } catch { /* best effort */ }
+  };
   handle.actor = () => actor;
   return handle;
 }
@@ -343,6 +347,12 @@ function serve({ input = process.stdin, output = process.stdout, ...opts } = {})
     if (res) write(res);
   });
   rl.on('close', () => handle.close());
+  // Clients usually stop their MCP servers with a signal, not by closing stdin.
+  // The store writes synchronously, so the name is freed before the process ends.
+  process.once('exit', () => handle.close());
+  for (const sig of ['SIGTERM', 'SIGINT', 'SIGHUP']) {
+    process.once(sig, () => { handle.close(); process.exit(0); });
+  }
   return rl;
 }
 

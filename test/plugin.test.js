@@ -136,6 +136,27 @@ test('stdio plugin frees its board name when the client disconnects', async () =
   assert.match((await run()).result.instructions, /as "cc"\./, 'not cc#2: the first session released it');
 });
 
+test('stdio plugin frees its board name when the client stops it with a signal', { skip: process.platform === 'win32' && 'Windows has no catchable SIGTERM' }, async () => {
+  const dir = tmpDir();
+  const start = () => new Promise((resolve) => {
+    const child = spawn(process.execPath, [path.join(__dirname, '..', 'bin', 'agenthaven.js'), 'mcp', '--agent', 'cc'], { env: { ...process.env, AGENTHAVEN_HOME: dir } });
+    child.stdout.once('data', (d) => resolve({ child, init: JSON.parse(d.toString().trim().split('\n')[0]) }));
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-06-18' } })}\n`);
+  });
+  const children = [];
+  try {
+    const first = await start();
+    children.push(first.child);
+    assert.match(first.init.result.instructions, /as "cc"\./);
+    await new Promise((resolve) => { first.child.on('close', resolve); first.child.kill('SIGTERM'); });
+    const second = await start();
+    children.push(second.child);
+    assert.match(second.init.result.instructions, /as "cc"\./, 'not cc#2: SIGTERM released the name');
+  } finally {
+    for (const c of children) if (c.exitCode === null) c.kill('SIGKILL');
+  }
+});
+
 // ---- editor hooks ---------------------------------------------------------
 
 function boardWithClaim() {
