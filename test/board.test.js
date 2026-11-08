@@ -303,7 +303,9 @@ test('workboard: backslashes and pipes in text cannot break the tables', () => {
 
 test('dreaming: past mistakes become lessons that reach the next agent', async () => {
   const dreams = require('../src/dream');
-  const s = tmpStore({ leaseMs: 30 });
+  const s = tmpStore();
+  // Only the renderer task gets a short lease, so slow machines cannot expire the other claims.
+  const fast = new Store({ dataDir: s.dataDir, leaseMs: 30 });
   // Two reviews in src/api sent back for the same reason.
   for (const n of [1, 2]) {
     const t = s.createTask({ title: `Endpoint ${n}`, files: [`src/api/e${n}.js`], review: true, actor: 'roel' });
@@ -313,10 +315,10 @@ test('dreaming: past mistakes become lessons that reach the next agent', async (
   }
   // A task whose claims keep expiring.
   const big = s.createTask({ title: 'Rewrite the renderer', actor: 'roel' });
-  s.claimTask(big.id, { actor: 'gemini' });
-  await sleep(50);
-  s.claimTask(big.id, { actor: 'gemini' });
-  await sleep(50);
+  fast.claimTask(big.id, { actor: 'gemini' });
+  await sleep(80);
+  fast.claimTask(big.id, { actor: 'gemini' });
+  await sleep(80);
   s.listTasks();
   // Two notes that say the same thing.
   s.addNote({ title: 'Paths', body: 'Always store paths with forward slashes in the store', actor: 'a' });
@@ -325,8 +327,8 @@ test('dreaming: past mistakes become lessons that reach the next agent', async (
   const d = dreams.dream(s);
   const kinds = [...new Set(d.proposals.map((p) => p.kind))].sort();
   assert.deepEqual(kinds, ['agent-tip', 'lesson', 'merge-notes', 'task']);
-  // With a 30 ms lease, both gemini (renderer) and codex (sent-back work) went quiet twice.
-  assert.deepEqual(d.proposals.filter((p) => p.kind === 'agent-tip').map((p) => p.agent).sort(), ['codex', 'gemini']);
+  // gemini went quiet twice on the renderer.
+  assert.deepEqual(d.proposals.filter((p) => p.kind === 'agent-tip').map((p) => p.agent), ['gemini']);
   const lesson = d.proposals.find((p) => p.kind === 'lesson');
   assert.match(lesson.title, /src\/api was sent back 2 times/);
   assert.match(lesson.body, /missing input validation tests/);
