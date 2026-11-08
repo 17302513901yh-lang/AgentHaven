@@ -14,15 +14,15 @@ const tmpStore = (opts = {}) => new Store({ dataDir: tmpDir(), ...opts });
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 test('leases: a quiet agent loses its claim, a heartbeat keeps it', async () => {
-  // At least 200 ms of slack on each side, so slow CI disks cannot flip the outcome.
-  const s = tmpStore({ leaseMs: 600 });
+  // Wide margins: Windows CI spends hundreds of ms on file locks and renames alone.
+  const s = tmpStore({ leaseMs: 2000 });
   const a = s.createTask({ title: 'A', files: ['src/a.js'], actor: 'x' });
   const b = s.createTask({ title: 'B', actor: 'x' });
   s.claimTask(a.id, { actor: 'claude' });
   s.claimTask(b.id, { actor: 'codex' });
-  await sleep(400); // both leases still valid (600 ms)
-  s.heartbeat({ actor: 'codex' }); // codex now runs until ~1000 ms
-  await sleep(400); // claude's lease ended at ~600 ms
+  await sleep(1200); // both leases still valid (2000 ms)
+  s.heartbeat({ actor: 'codex' }); // codex now runs until ~3200 ms
+  await sleep(1200); // claude's lease ended at ~2000 ms; codex has ~800 ms to spare
   const after = s.getTask(a.id);
   assert.equal(after.status, 'todo');
   assert.equal(after.assignee, null);
