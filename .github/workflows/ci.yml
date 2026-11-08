@@ -87,20 +87,20 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
-      # Bootstrap the first draft once after merge. Later releases use v* tags.
-      # A tag created with GITHUB_TOKEN does not trigger another workflow, so
-      # this run attaches the installers it has just built and verified.
+      # A merge to main that bumps the version creates the v<version> tag and a
+      # draft release once (an existing tag is never moved). A pushed v* tag
+      # does the same. Releases stay drafts until the owner publishes them. A tag created with GITHUB_TOKEN does not trigger another
+      # workflow, so this run attaches the installers it has just built and verified.
       - name: Prepare release tag
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           node --input-type=module <<'JS'
-          import { readFileSync, appendFileSync } from 'node:fs';
+          import { readFileSync, appendFileSync, existsSync } from 'node:fs';
           const version = JSON.parse(readFileSync('package.json', 'utf8')).version;
           const isMain = process.env.GITHUB_REF === 'refs/heads/main';
-          if (isMain && version !== '0.2.0') process.exit(0);
-          const tag = isMain ? 'v0.2.0' : process.env.GITHUB_REF_NAME;
+          const tag = isMain ? `v${version}` : process.env.GITHUB_REF_NAME;
           if (tag !== `v${version}`) throw new Error('Release tag must match package.json version');
           const api = `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}`;
           const headers = { Authorization: `Bearer ${process.env.GH_TOKEN}`, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
@@ -111,7 +111,8 @@ jobs:
             const created = await fetch(`${api}/git/refs`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: `refs/tags/${tag}`, sha: process.env.GITHUB_SHA }) });
             if (!created.ok) throw new Error(`Tag creation failed: ${created.status}`);
           }
-          appendFileSync(process.env.GITHUB_OUTPUT, `ready=true\ntag=${tag}\n`);
+          const notes = `docs/releases/${tag}.md`;
+          appendFileSync(process.env.GITHUB_OUTPUT, `ready=true\ntag=${tag}\nnotes=${existsSync(notes) ? notes : ''}\n`);
           JS
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         if: steps.release.outputs.ready == 'true'
@@ -122,6 +123,6 @@ jobs:
         if: steps.release.outputs.ready == 'true'
         with:
           tag_name: ${{ steps.release.outputs.tag }}
-          body_path: ${{ steps.release.outputs.tag == 'v0.2.0' && 'docs/releases/v0.2.0.md' || '' }}
+          body_path: ${{ steps.release.outputs.notes }}
           draft: true
           files: dist/*
