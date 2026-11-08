@@ -16,6 +16,7 @@ const fail = (msg) => { console.error(msg); process.exit(1); };
 const HELP = `AgentHaven — one shared work board for all your AI agents, from any vendor
 
 Usage:
+  agenthaven --version                                      print the installed version (also -v or version)
   agenthaven serve        [--port 4777] [--workspace name]   open the local dashboard (also runs linked workboard syncs)
   agenthaven mcp          [--agent name] [--workspace name]  run the MCP agent plugin (stdio) for any MCP client
   agenthaven config       [--agent name] [--workspace name]  print an MCP client config snippet
@@ -116,6 +117,9 @@ switch (cmd) {
     if (d.proposals.some((p) => p.status === 'proposed')) console.log('\nReview them in the dashboard (Dreams), or turn on auto-apply there.');
     break;
   }
+  case '--version': case '-v': case 'version':
+    console.log(require('../package.json').version);
+    break;
   case 'help': case '--help': case '-h':
     console.log(HELP);
     break;
