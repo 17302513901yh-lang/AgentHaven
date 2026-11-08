@@ -87,7 +87,7 @@ Prefer an app? The [desktop app](#install) connects your agent apps by itself.
 
 ## Status
 
-Version 0.5 (alpha): a Claude Code plugin with hooks and slash commands, and a leaner MCP plugin;  a desktop app for Windows and macOS with automatic updates, multiple workspaces, a live dashboard, and one-click connection to Claude Desktop, Cursor, Windsurf, Gemini CLI and Codex. Installers are signed once the signing secrets are configured (see below).
+Version 0.6 (alpha): agent apps connect by themselves (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, LM Studio); a desktop app for Windows and macOS with updates from the dashboard, multiple workspaces and a live dashboard; a Claude Code plugin with hooks and slash commands. Installers are signed once the signing secrets are configured (see below).
 
 ## Install
 
