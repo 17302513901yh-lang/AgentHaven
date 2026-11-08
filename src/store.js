@@ -342,6 +342,16 @@ class Store {
     }
   }
 
+  // With checks configured, approval needs AgentHaven's own passing run on the submitted commit.
+  static assertVerified(data, task) {
+    if (!data.settings.checks?.length || !task.submittedSha) return;
+    const r = (task.receipts || []).filter((x) => x.sha === task.submittedSha).pop();
+    if (!r) throw new ConflictError(`the checks have not run on the submitted commit ${task.submittedSha.slice(0, 10)}: run_checks first`, task);
+    if (r.status === 'running') throw new ConflictError('the checks are still running; approve when they pass', task);
+    if (r.status !== 'passed') throw new ConflictError(`the checks failed on the submitted commit: ${r.results.filter((x) => x.exitCode !== 0).map((x) => x.name).join(', ')}`, task);
+    if (r.dirty) throw new ConflictError('the checks ran with uncommitted changes in the worktree; commit, submit again and let them run on the commit', task);
+  }
+
   static isHuman(data, actor) {
     return actor === 'you' || data.agents[actor]?.kind === 'human';
   }
@@ -509,15 +519,22 @@ class Store {
     if (kids.length) throw new ConflictError(`${kids.length} subtask(s) still open: ${kids.map((k) => `"${k.title}"`).join(', ')}`, task);
     if (task.questions.some((q) => !q.answer)) throw new ConflictError('a question on this task is still open; answer it or withdraw it first', task);
     if (Store.isAuthority(data, actor)) return;
+    // A task in its own worktree is done only after AgentHaven's own checks pass there.
+    if (data.settings.checks?.length && task.worktree) {
+      const last = (task.receipts || []).slice(-1)[0];
+      if (!last || last.status !== 'passed' || last.dirty) throw new ConflictError('run_checks must pass on your latest commit before this task is done', task);
+    }
     if (task.review) throw new ConflictError('this task needs review by someone else: use submit_for_review, then another agent or a human approves', task);
   }
 
   // A compact view for lists: no comment threads or metric series.
   static summary(task) {
-    const { comments, metrics, handoffs, ...rest } = task;
+    const { comments, metrics, handoffs, receipts, ...rest } = task;
     const last = {};
     for (const [k, pts] of Object.entries(metrics)) if (pts.length) last[k] = pts[pts.length - 1].v;
-    return { ...rest, metrics: last, comments: comments.length, lastHandoff: handoffs[handoffs.length - 1] || null };
+    const r = receipts?.[receipts.length - 1];
+    return { ...rest, metrics: last, comments: comments.length, lastHandoff: handoffs[handoffs.length - 1] || null,
+      lastReceipt: r ? { status: r.status, sha: r.sha, at: r.finishedAt || r.startedAt } : null };
   }
 
   listTasks({ status, assignee, full = false } = {}) {
@@ -546,7 +563,7 @@ class Store {
     const brief = (t) => t && { id: t.id, title: t.title, status: t.status, assignee: t.assignee };
     const outcome = (t) => ({ ...brief(t), lastHandoff: t.handoffs[t.handoffs.length - 1] || null, verification: t.verification, reviewedBy: t.reviewedBy || null });
     const words = new Set(`${task.title} ${task.description}`.toLowerCase().match(/[a-z0-9]{4,}/g) || []);
-    const related = data.notes.filter((n) => !n.tags.includes('lesson'))
+    const related = data.notes.filter((n) => !n.tags.includes('lesson') && !n.quarantined)
       .map((n) => ({ n, score: (`${n.title} ${n.body}`.toLowerCase().match(/[a-z0-9]{4,}/g) || []).filter((w) => words.has(w)).length }))
       .filter((x) => x.score > 1).sort((a, b) => b.score - a.score).slice(0, 5).map(({ n }) => ({ id: n.id, title: n.title, body: n.body.slice(0, 1500) }));
     const claims = data.tasks.filter((t) => t.id !== task.id && ACTIVE.includes(t.status) && t.assignee && t.files.some((f) => task.files.some((g) => overlaps(f, g))))
@@ -828,7 +845,7 @@ class Store {
 
   // `verification` is how the work was checked (commands, tests, results): reviewers
   // check that, and "done" never rests on an unverified claim.
-  submitForReview(id, { actor, summary, verification, reviewer }) {
+  submitForReview(id, { actor, summary, verification, reviewer, sha, protectedTouched }) {
     actor = requireText(actor, 'actor', 100);
     summary = requireText(summary, 'summary');
     verification = requireText(verification ?? '', 'verification (how you checked the work: commands, tests and their results)', 5000);
@@ -846,7 +863,7 @@ class Store {
       }
       if (who === actor) throw new ConflictError('you cannot review your own work; pick another reviewer', task);
       task.comments.push({ id: newId('cmt'), at: now(), actor, body: `Ready for review: ${summary}\nVerified: ${verification}`, kind: 'review-request' });
-      Object.assign(task, { status: 'review', reviewer: who, verification, approvals: [], leaseUntil: null, updatedAt: now(), lastActor: actor, version: task.version + 1 });
+      Object.assign(task, { status: 'review', reviewer: who, verification, approvals: [], submittedSha: sha || null, protectedTouched: Array.isArray(protectedTouched) ? protectedTouched.slice(0, 100) : [], leaseUntil: null, updatedAt: now(), lastActor: actor, version: task.version + 1 });
       Store.message(data, { from: actor, to: who || 'skill:review', body: `Please review "${task.title}": ${summary}`, task: id, kind: 'review-request' });
       Store.seen(data, actor);
       Store.log(data, actor, 'task.review_requested', id, summary);
@@ -866,6 +883,10 @@ class Store {
       if (approve) {
         const open = task.criteria.filter((c) => !c.done);
         if (open.length) throw new ConflictError(`${open.length} acceptance criteria still open: ${open.map((c) => c.text).join('; ')}`, task);
+        Store.assertVerified(data, task);
+        if (task.protectedTouched?.length && !Store.isHuman(data, actor)) {
+          throw new ConflictError(`this work changes protected paths (${task.protectedTouched.slice(0, 5).join(', ')}): a human must approve it`, task);
+        }
       }
       if (comment) task.comments.push({ id: newId('cmt'), at: now(), actor, body: comment, kind: approve ? 'approval' : 'changes-requested' });
       let finished = false;
@@ -972,12 +993,13 @@ class Store {
     });
   }
 
-  listNotes({ query } = {}) {
+  // Quarantined notes (flagged by Guard) stay hidden from agents until a human releases them.
+  listNotes({ query, includeQuarantined = false } = {}) {
     const q = query && query.toLowerCase();
-    return this.read().notes.filter((n) => !q || `${n.title}\n${n.body}\n${n.tags.join(' ')}`.toLowerCase().includes(q));
+    return this.read().notes.filter((n) => (includeQuarantined || !n.quarantined) && (!q || `${n.title}\n${n.body}\n${n.tags.join(' ')}`.toLowerCase().includes(q)));
   }
 
-  addNote({ title, body, tags, actor }) {
+  addNote({ title, body, tags, actor, quarantine }) {
     actor = requireText(actor, 'actor', 100);
     const note = {
       id: newId('note'),
@@ -986,6 +1008,7 @@ class Store {
       tags: Array.isArray(tags) ? tags.map(String).slice(0, 20) : [],
       author: actor,
       createdAt: now(),
+      ...(quarantine ? { quarantined: quarantine } : {}),
     };
     return this.withLock((data) => {
       data.notes.push(note);
@@ -1063,5 +1086,7 @@ class Store {
     });
   }
 }
+
+require('./guard').install(Store);
 
 module.exports = { ESCALATE_AT, Store, ConflictError, ValidationError, NotFoundError, STATUSES, ACTIVE, AGENT_KINDS, defaultDataDir, overlaps, normFile };

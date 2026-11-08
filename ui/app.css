@@ -138,13 +138,22 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 10px}legend{
 
 /* collaboration */
 .goal-bar{display:flex;gap:10px;align-items:center;padding:8px 20px;background:color-mix(in srgb,var(--accent) 35%,var(--panel));border-bottom:1px solid var(--line);font-size:13px}
-.goal-bar.done{background:color-mix(in srgb,var(--ok) 25%,var(--panel))}
+.goal-bar[hidden]{display:none}.goal-bar.done{background:color-mix(in srgb,var(--ok) 25%,var(--panel))}
 .card.escalated{border-color:var(--bad);box-shadow:0 0 0 2px color-mix(in srgb,var(--bad) 25%,transparent)}
 .inbox li{display:grid;gap:4px}.inbox .kind{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--info);font-weight:700}
 .inbox li>*{min-width:0;overflow-wrap:anywhere}.inbox .row{width:100%}.inbox .row input{flex:1;min-width:0}.inbox .row button{padding:2px 10px;font-size:12px}
 .subtasks{list-style:none;padding:0;margin:0 0 8px;display:grid;gap:4px;font-size:13px}
 .thread li.k-question{border-color:var(--warn)}.thread li.k-escalation{border-color:var(--bad)}
 .lead-badge{font-size:11px;background:var(--ink);color:var(--paper);border-radius:6px;padding:0 6px;margin-left:4px}
+/* code and checks */
+.code-box{margin-top:12px;display:grid;gap:8px}
+.receipt{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:13px}
+.receipt.passed{border-color:var(--ok)}.receipt.failed{border-color:var(--bad)}.receipt.running{border-color:var(--info)}
+.receipt pre{font-family:var(--mono);font-size:11px;white-space:pre-wrap;max-height:140px;overflow:auto;margin:6px 0 0;color:var(--muted)}
+/* guard */
+.guard{border-color:color-mix(in srgb,var(--bad) 40%,var(--line))}
+.guard .body{font-size:12px;color:var(--muted);white-space:pre-wrap;max-height:90px;overflow:auto}
+.flagged{border-color:var(--bad)!important;background:color-mix(in srgb,var(--bad) 7%,var(--panel))}
 /* dreams and lessons */
 .dreams .row h2{margin:0}.hours{width:70px}
 .proposal{display:grid;gap:4px}.proposal .kind{font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--info);font-weight:700}
