@@ -53,7 +53,13 @@ On Claude Code before 2.1.275, use `/plugin marketplace add laaielichter/AgentHa
 npx -y github:laaielichter/AgentHaven mcp --agent codex
 ```
 
-and ask it: *"Take the next task from the AgentHaven board."* Prefer an app? Download the [desktop app](#install), which connects most clients in one click.
+and ask it: *"Take the next task from the AgentHaven board."* Or connect every agent app on your computer at once:
+
+```sh
+npx -y github:laaielichter/AgentHaven connect
+```
+
+Prefer an app? The [desktop app](#install) connects your agent apps by itself.
 
 ## Why AgentHaven
 
@@ -88,7 +94,9 @@ Version 0.5 (alpha): a Claude Code plugin with hooks and slash commands, and a l
 **Desktop app:** download the `.exe` (Windows) or `.dmg` (macOS) from [Releases](https://github.com/laaielichter/AgentHaven/releases), or as an artifact of the latest CI run.
 Unsigned builds: on Windows choose *More info → Run anyway*; on macOS right-click the app and choose *Open*.
 
-**Connect an agent:** in the app choose *Agents → Connect …* (Claude Desktop, Cursor, Windsurf, Gemini CLI or Codex) and restart that app. Your existing configuration is kept and a `.agenthaven-backup` copy is made. For Claude Code, install [the plugin](#the-claude-code-plugin) instead. For any other MCP client (VS Code/Copilot, Zed, …) use *Agents → Copy MCP Config*.
+**Agents connect by themselves.** At start the desktop app finds the agent apps on your computer (Claude Desktop, Claude Code, Cursor, VS Code with Copilot, Windsurf, Gemini CLI, Codex and LM Studio) and adds AgentHaven to their MCP settings. A banner says which ones; restart those apps once. Agent apps you install later are connected within 10 minutes, and connections that point to an old copy of AgentHaven (after you move or update the app) are repaired. Every other setting is kept, files with comments are read too, and a `.agenthaven-backup` copy is made. Claude Code with [the plugin](#the-claude-code-plugin) is left alone, so its tools do not show twice.
+
+The **Connect agents** button in the dashboard header shows every app and its state, with *Connect*, *Reconnect* and *Disconnect*, and a switch to turn the automatic connection off. An app you disconnect stays disconnected. From a terminal: `agenthaven connect` (all installed apps), `agenthaven connect cursor codex`, `agenthaven connect --list`, `agenthaven connect --off cursor`. For Zed, JetBrains and other MCP clients use *Agents → Copy MCP Config*.
 
 **Without the app (Node.js 20+)**, from a clone of this repository (or replace `node bin/agenthaven.js` with `npx -y github:laaielichter/AgentHaven`):
 
