@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Updates in the dashboard** (desktop app): an update bar with download progress, release notes, *Restart and update*, *Later* and *Skip this version*, a version button in the header with an auto-check switch, and a one-time "updated to" note. Windows installs silently on restart; an unsigned macOS build downloads and opens the new `.dmg` instead of failing.
+
 - `examples/report_progress.mjs`: the training-loop reporter for Node.js 20+, with no dependencies, next to the Python one. Thanks to @Daiyuanranfeng for this, and for the careful end-to-end test! (#14)
 
 ## 0.5.0

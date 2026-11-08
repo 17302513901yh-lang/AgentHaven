@@ -15,7 +15,7 @@
 - `src/server.js` HTTP API + `ui/` dashboard, 127.0.0.1 only, Host/Origin check. Workspace via `?workspace=`.
 - `src/connect.js` merges the MCP entry into Claude Desktop/Cursor/Windsurf/Gemini CLI JSON configs (backup, refuses invalid JSON) and the Codex TOML config (replaces only `[mcp_servers.agenthaven]`).
 - `src/server.js` acts as the agent named in `X-AgentHaven-Agent`, else as the human `you`. `/api/stream` is SSE (polls the workspace file mtime).
-- `desktop/main.js` Electron shell + electron-updater (GitHub Releases). `bin/agenthaven.js` CLI.
+- `desktop/main.js` Electron shell. `desktop/updater.js` update state machine (electron-updater, GitHub Releases; no Electron imports, tested in `test/updater.test.js`). `desktop/preload.js` exposes only `window.agenthavenDesktop.updates` to the dashboard; IPC checks the sender is the app's own origin. `bin/agenthaven.js` CLI.
 - `docs/` = GitHub Pages site (plain HTML/CSS/JS, no build). `docs/assets/dashboard.png|webp` is a real screenshot of the dashboard with a seeded demo workspace; `docs/assets/social.png` (1280x640) is the social preview, also used by README and `og:image`. Retake both when the UI changes visibly. All repo-facing text (README, site, UI, commits) is English.
 
 ## Commands

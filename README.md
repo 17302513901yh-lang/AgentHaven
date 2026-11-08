@@ -261,6 +261,15 @@ npm run dist:win           # or dist:mac — installer in dist/
 
 Pushing a tag `vX.Y.Z` (matching `version` in `package.json`) builds the installers and creates a draft release. Publish that release; automatic updates read `latest.yml` / `latest-mac.yml` from the published release. A merge to `main` that raises the version does the same. To publish, run **Actions → Publish release → Run workflow** (also from the GitHub app on a phone): it checks that the installers and update files are attached, publishes the draft as the latest release, and deletes older drafts that were never published.
 
+### Automatic updates
+
+The desktop app checks GitHub Releases at start and every 6 hours (switch it off under the version button in the dashboard header). Only published releases count; drafts and pre-releases are ignored.
+
+- **Windows**: the update downloads in the background (only the changed blocks when possible). The dashboard shows a bar with progress, then *Restart and update* installs it silently and starts the new version. If you click *Later*, it installs when you quit.
+- **macOS, signed and notarized**: the same, through Squirrel.Mac.
+- **macOS, unsigned**: macOS does not let an unsigned app replace itself, so *Download* saves the new `.dmg` to Downloads with progress, *Open and quit* opens it, and you drag AgentHaven onto Applications. Boards are kept.
+- *What's new* shows the release notes; *Skip this version* hides that version until you check by hand. After an update, the dashboard says once which version you came from.
+
 Repository secrets for signing (optional; without them builds are unsigned):
 
 | Secret | Purpose |

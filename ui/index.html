@@ -17,11 +17,23 @@
     <button type="button" id="new-workspace" class="ghost" title="New workspace">+ Workspace</button>
     <button type="button" id="share-files" class="ghost" title="Let agents without MCP join through WORKBOARD.md">Share as files</button>
     <a id="star-link" class="star-link" href="https://github.com/laaielichter/AgentHaven" target="_blank" rel="noopener" title="AgentHaven is free and open source. A star on GitHub helps other people find it.">★ Star</a>
+    <button type="button" id="update-btn" class="update-pill" hidden title="Updates"></button>
     <span id="status" class="status" role="status" aria-live="polite">Connecting…</span>
   </div>
 </header>
 
 <div id="goal-bar" class="goal-bar" hidden></div>
+<div id="update-banner" class="update-banner" role="status" aria-live="polite" hidden>
+  <span id="update-icon" class="update-icon" aria-hidden="true">⬆</span>
+  <div class="update-body">
+    <strong id="update-title"></strong>
+    <span id="update-detail" class="m"></span>
+    <div id="update-progress" class="update-progress" hidden><div id="update-bar"></div></div>
+  </div>
+  <button type="button" id="update-notes" class="ghost">What's new</button>
+  <button type="button" id="update-action"></button>
+  <button type="button" id="update-later" class="ghost">Later</button>
+</div>
 <div id="star-banner" class="star-banner" role="note" hidden>
   <span id="star-text"></span>
   <a class="star-cta" href="https://github.com/laaielichter/AgentHaven" target="_blank" rel="noopener">★ Star on GitHub</a>
@@ -217,6 +229,25 @@
     <h2 id="ws-h">New workspace</h2>
     <label>Name (letters, digits, - and _) <input name="name" required pattern="[A-Za-z0-9_\-]{1,64}"></label>
     <div class="row"><span class="grow"></span><button type="button" id="ws-cancel" class="ghost">Cancel</button><button type="submit">Create</button></div>
+  </form>
+</dialog>
+
+<dialog id="update-dialog" aria-labelledby="update-h">
+  <form method="dialog" class="stack">
+    <div class="row"><h2 id="update-h" class="grow">Updates</h2><span id="upd-current" class="m"></span></div>
+    <p id="upd-status" class="m"></p>
+    <div id="upd-progress" class="update-progress" hidden><div id="upd-bar"></div></div>
+    <pre id="upd-notes" class="update-notes" hidden></pre>
+    <p id="upd-mac" class="m" hidden>This copy of AgentHaven is not signed by Apple, so macOS will not let it replace itself. AgentHaven downloads the new disk image to your Downloads folder and opens it: drag AgentHaven onto Applications and choose <em>Replace</em>. Your boards are kept.</p>
+    <label class="check"><input type="checkbox" id="upd-auto"> Check for updates automatically (at start and every 6 hours)</label>
+    <div class="row">
+      <button type="button" id="upd-skip" class="ghost" hidden>Skip this version</button>
+      <button type="button" id="upd-releases" class="ghost">All releases</button>
+      <span class="grow"></span>
+      <button type="submit" class="ghost">Close</button>
+      <button type="button" id="upd-check" class="ghost">Check now</button>
+      <button type="button" id="upd-action" hidden></button>
+    </div>
   </form>
 </dialog>
 
