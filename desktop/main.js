@@ -70,6 +70,8 @@ function buildMenu() {
     { role: 'help', submenu: [
       { label: 'Check for Updates…', enabled: app.isPackaged, click: () => checkForUpdates(true) },
       { label: 'AgentHaven on GitHub', click: () => shell.openExternal('https://github.com/laaielichter/AgentHaven') },
+      { label: 'Star AgentHaven on GitHub ⭐', click: () => shell.openExternal('https://github.com/laaielichter/AgentHaven/stargazers') },
+      { label: 'Contribute: Good First Issues', click: () => shell.openExternal('https://github.com/laaielichter/AgentHaven/contribute') },
     ] },
   ]));
 }

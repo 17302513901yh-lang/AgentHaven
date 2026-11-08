@@ -3,6 +3,11 @@
 All notable changes to AgentHaven. Full notes for each version are in [`docs/releases/`](docs/releases/),
 and the installers are on the [Releases page](https://github.com/laaielichter/AgentHaven/releases).
 
+## Unreleased
+
+- `agenthaven --version` (also `-v` and `version`) prints the installed version. Thanks to @Daiyuanranfeng for this, the first outside contribution to AgentHaven! (#11)
+- The README, website, desktop app (*Help*) and `agenthaven serve` now invite people to contribute and to star the project.
+
 ## 0.4.0
 
 Safety and proof for teams of agents from different vendors. [Full notes](docs/releases/v0.4.0.md)
