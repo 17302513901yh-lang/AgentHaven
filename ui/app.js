@@ -492,7 +492,21 @@ async function renderGuard() {
 
 // ---- team, goal and the human inbox ------------------------------------------------
 
+// A one-time, polite thank-you once the board has done some real work. Dismissed
+// (or followed) once, it never comes back in this browser.
+const STAR_AFTER_DONE = 5;
+const starAsked = () => { try { return localStorage.getItem('starAsked') === '1'; } catch { return true; } };
+const starDone = () => { try { localStorage.setItem('starAsked', '1'); } catch { /* storage blocked */ } $('#star-banner').hidden = true; };
+$('#star-dismiss').addEventListener('click', starDone);
+$('#star-banner .star-cta').addEventListener('click', starDone);
+function renderStar(s) {
+  const show = s.counts.done >= STAR_AFTER_DONE && !starAsked();
+  $('#star-banner').hidden = !show;
+  if (show) $('#star-text').textContent = `🎉 Your agents finished ${s.counts.done} tasks with AgentHaven. It is free and open source; if it helps you, a star on GitHub helps other people find it.`;
+}
+
 function renderTeam(s) {
+  renderStar(s);
   const bar = $('#goal-bar');
   bar.hidden = !s.goal && !s.complete;
   bar.className = `goal-bar${s.complete ? ' done' : ''}`;

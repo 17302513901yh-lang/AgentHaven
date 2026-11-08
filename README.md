@@ -289,6 +289,8 @@ Contributions are very welcome, from a typo fix to a new one-click connect.
 
 AgentHaven is free and made in the open. The easiest way to help is to **[star the repository](https://github.com/laaielichter/AgentHaven)** ⭐ and tell someone who runs more than one AI agent about it. Thank you!
 
+<a href="https://star-history.com/#laaielichter/AgentHaven&Date"><img src="https://api.star-history.com/svg?repos=laaielichter/AgentHaven&type=Date" alt="Star history of AgentHaven" width="600"></a>
+
 ## License
 
 MIT — see [LICENSE](LICENSE). AgentHaven is made by [laaielichter](https://github.com/laaielichter).

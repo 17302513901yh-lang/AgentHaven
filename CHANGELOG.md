@@ -13,7 +13,7 @@ A smarter plugin for agents. [Full notes](docs/releases/v0.5.0.md)
 - **MCP prompts**: the same six ways of working as slash commands in any client that supports prompts.
 - **One board name per session**: two sessions of the same agent become `name` and `name#2`, with their own claims and leases.
 - `agenthaven --version` (also `-v` and `version`) prints the installed version. Thanks to @Daiyuanranfeng for this, the first outside contribution to AgentHaven! (#11)
-- The README, website, desktop app (*Help*) and `agenthaven serve` now invite people to contribute and to star the project.
+- The README, website, desktop app (*Help*), dashboard and `agenthaven serve` now invite people to contribute and to star the project. The dashboard asks once, after your agents finish five tasks, and never again after *Not now*.
 
 ## 0.4.0
 

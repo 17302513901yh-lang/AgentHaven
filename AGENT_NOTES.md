@@ -30,7 +30,7 @@
 - Auto-update only sees *published* releases; CI creates drafts.
 
 ## Conventions
-- Every README, website and release note ends with a short, polite request to star the repository, and links the `good first issue` and `help wanted` labels for contributors. Never offer anything in exchange for a star, and never ask for stars in issues, PR comments or other people's threads.
+- Every README, website and release note ends with a short, polite request to star the repository (the dashboard has a ★ Star link and asks once, after five done tasks; never in agent-facing text such as hooks, prompts or MCP instructions), and links the `good first issue` and `help wanted` labels for contributors. Never offer anything in exchange for a star, and never ask for stars in issues, PR comments or other people's threads.
 - New release notes in `docs/releases/` end with a "Help AgentHaven grow" section (copy it from the latest one) and thank contributors by @name.
 - Pin actions to commit SHA with version comment; for annotated tags use the `^{}` SHA (`git ls-remote`).
 - Conventional commits (`feat:`, `ci:`, `docs:`).
