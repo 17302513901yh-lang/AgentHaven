@@ -21,6 +21,30 @@ test('CLI version aliases print the package version', () => {
   }
 });
 
+test('CLI status prints a short summary of the board', () => {
+  const cli = path.join(__dirname, '..', 'bin', 'agenthaven.js');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-status-'));
+  const s = new Store({ dataDir: home });
+  s.setGoal({ actor: 'you', text: 'Ship the release', doneWhen: 'lint and tests pass' });
+  s.createTask({ title: 'Write docs', actor: 'you' });
+  const bug = s.createTask({ title: 'Fix retry bug', actor: 'you' });
+  s.claimTask(bug.id, { actor: 'claude' });
+  s.askQuestion(bug.id, { actor: 'claude', to: 'humans', question: 'Which runner should CI use?' });
+  const ship = s.createTask({ title: 'Ship v1', actor: 'you' });
+  const claimed = s.claimTask(ship.id, { actor: 'codex' });
+  s.updateTask(ship.id, { version: claimed.version, status: 'review', actor: 'codex' });
+  const env = { ...process.env, AGENTHAVEN_HOME: home, AGENTHAVEN_WORKSPACE: 'default' };
+  const out = execFileSync(process.execPath, [cli, 'status'], { cwd: os.tmpdir(), encoding: 'utf8', env });
+  assert.match(out, /Goal: Ship the release \(done when: lint and tests pass\)/);
+  assert.match(out, /Board: 1 to do, 0 doing, 1 blocked, 1 in review, 0 done\./);
+  assert.match(out, /claude → "Fix retry bug" \(blocked\)/);
+  assert.match(out, /codex → "Ship v1" \(review\)/);
+  assert.match(out, /question to humans: Which runner should CI use\?/);
+  assert.match(out, /"Ship v1" — in review/);
+  const help = execFileSync(process.execPath, [cli, 'help'], { cwd: os.tmpdir(), encoding: 'utf8', env });
+  assert.match(help, /agenthaven status/);
+});
+
 test('tasks: create, claim, conflict-safe update, handoff, activity', () => {
   const s = tmpStore();
   const t = s.createTask({ title: 'Write docs', actor: 'claude' });

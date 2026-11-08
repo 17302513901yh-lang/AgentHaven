@@ -28,6 +28,7 @@ Usage:
   agenthaven sync         [--watch] [--workspace name]       apply WORKBOARD.md Inbox commands and rewrite the board
   agenthaven instructions [--workspace name]                 text to paste into AGENTS.md, CLAUDE.md, GEMINI.md, ...
   agenthaven board        [--workspace name]                 print the board as Markdown
+  agenthaven status       [--workspace name]                 short summary: goal, counts, who works on what, what waits on a human
   agenthaven repo <path> [--base main]                       human: the git repository this board works on
   agenthaven checks "<command>" ["<command>" ...]            human: the checks AgentHaven runs before approval
   agenthaven radar                                           files changed on more than one active branch
@@ -95,6 +96,29 @@ switch (cmd) {
   case 'board':
     console.log(require('../src/workboard').renderBoard(store()));
     break;
+  case 'status': {
+    const s = store();
+    const st = s.stats();
+    const c = st.counts;
+    const lines = [];
+    if (st.goal) lines.push(`Goal: ${st.goal.text}${st.goal.doneWhen ? ` (done when: ${st.goal.doneWhen})` : ''}`);
+    lines.push(`Board: ${c.todo} to do, ${c.doing} doing, ${c.blocked} blocked, ${c.review} in review, ${c.done} done.`);
+    if (!st.total) lines.push('The board is empty.');
+    else if (st.complete) lines.push('Every task is done.');
+    const working = s.listAgents().filter((a) => a.tasks.length)
+      .map((a) => `${a.name} → ${a.tasks.map((t) => `"${t.title}" (${t.status})`).join(', ')}`);
+    lines.push(working.length ? `Working:\n  ${working.join('\n  ')}` : 'Nobody holds a task.');
+    const waiting = [];
+    for (const t of s.listTasks()) {
+      if (t.status === 'done') continue;
+      for (const q of t.questions) if (!q.answer && q.to === 'humans') waiting.push(`❓ ${t.id} "${t.title}" — question to humans: ${q.text}`);
+      if (t.escalated) waiting.push(`⚠ ${t.id} "${t.title}" — escalated: ${t.escalated.reason}`);
+      if (t.status === 'review') waiting.push(`⏳ ${t.id} "${t.title}" — ${t.reviewer ? `in review with ${t.reviewer}` : 'in review, waiting for a reviewer'}`);
+    }
+    lines.push(waiting.length ? `Waiting on a human:\n  ${waiting.join('\n  ')}` : 'Nothing waits on a human.');
+    console.log(lines.join('\n'));
+    break;
+  }
   case 'repo': {
     const r = require('../src/git').setRepo(store(), { actor: 'you', dir: path.resolve(positional[0] || fail('usage: agenthaven repo <path>')), base: flag('base') });
     console.log(`Repository: ${r.path} (base ${r.base})`);
