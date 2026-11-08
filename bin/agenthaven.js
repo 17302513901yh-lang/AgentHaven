@@ -19,6 +19,8 @@ Usage:
   agenthaven --version                                      print the installed version (also -v or version)
   agenthaven serve        [--port 4777] [--workspace name]   open the local dashboard (also runs linked workboard syncs)
   agenthaven mcp          [--agent name] [--workspace name]  run the MCP agent plugin (stdio) for any MCP client
+                          [--tools core,code,review,plan,team,lead,dream|all]  tool profiles (default core)
+  agenthaven hook <event> [--agent name]                     editor hook: session-start, pre-tool-use or stop (JSON on stdin)
   agenthaven config       [--agent name] [--workspace name]  print an MCP client config snippet
   agenthaven link <folder> [--workspace name]                share the board as WORKBOARD.md + LOGBOOK.md in a folder,
                                                              so agents without MCP can join by editing a file
@@ -42,7 +44,7 @@ const linkedDir = (s) => s.getSettings().workboardDir || fail(`workspace "${work
 
 switch (cmd) {
   case 'mcp':
-    require('../src/mcp').serve({ store: store(), agent: flag('agent', process.env.AGENTHAVEN_AGENT) });
+    require('../src/mcp').serve({ store: store(), agent: flag('agent', process.env.AGENTHAVEN_AGENT), tools: flag('tools', process.env.AGENTHAVEN_TOOLS) });
     break;
   case 'serve':
     require('../src/server').start({ port: Number(flag('port', 4777)), store: store(), onError: (err, ws) => console.error(`[workboard ${ws}] ${err.message}`) })
@@ -119,6 +121,10 @@ switch (cmd) {
   }
   case '--version': case '-v': case 'version':
     console.log(require('../package.json').version);
+    break;
+  case 'hook': // called by editor hooks (the Claude Code plugin); reads JSON on stdin
+    require('../src/hooks').run(positional[0], { store, agent: flag('agent', process.env.AGENTHAVEN_AGENT || 'claude-code') })
+      .then((code) => { process.exitCode = code; });
     break;
   case 'help': case '--help': case '-h':
     console.log(HELP);

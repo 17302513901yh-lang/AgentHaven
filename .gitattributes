@@ -1,0 +1,3 @@
+# The Claude Code plugin files are read as-is by Claude Code; keep them LF on every OS.
+claude/** text eol=lf
+.claude-plugin/*.json text eol=lf

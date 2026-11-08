@@ -16,11 +16,17 @@
     <select id="workspace" title="Workspace"></select>
     <button type="button" id="new-workspace" class="ghost" title="New workspace">+ Workspace</button>
     <button type="button" id="share-files" class="ghost" title="Let agents without MCP join through WORKBOARD.md">Share as files</button>
+    <a id="star-link" class="star-link" href="https://github.com/laaielichter/AgentHaven" target="_blank" rel="noopener" title="AgentHaven is free and open source. A star on GitHub helps other people find it.">★ Star</a>
     <span id="status" class="status" role="status" aria-live="polite">Connecting…</span>
   </div>
 </header>
 
 <div id="goal-bar" class="goal-bar" hidden></div>
+<div id="star-banner" class="star-banner" role="note" hidden>
+  <span id="star-text"></span>
+  <a class="star-cta" href="https://github.com/laaielichter/AgentHaven" target="_blank" rel="noopener">★ Star on GitHub</a>
+  <button type="button" id="star-dismiss" class="ghost">Not now</button>
+</div>
 <main class="layout">
   <section aria-labelledby="board-h" class="main">
     <div class="toolbar">

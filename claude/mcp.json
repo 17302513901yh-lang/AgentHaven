@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "agenthaven": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/bin/agenthaven.js", "mcp", "--agent", "claude-code"]
+    }
+  }
+}

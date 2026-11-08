@@ -1,0 +1,15 @@
+{
+  "name": "agenthaven",
+  "owner": { "name": "laaielichter", "url": "https://github.com/laaielichter" },
+  "metadata": { "description": "AgentHaven: one local work board for AI agents from every vendor." },
+  "plugins": [
+    {
+      "name": "agenthaven",
+      "source": "./",
+      "description": "One local work board for all your AI agents: file claims that Claude Code respects, leases, review gates, verified checks and handoffs.",
+      "version": "0.5.0",
+      "category": "productivity",
+      "homepage": "https://laaielichter.github.io/AgentHaven/"
+    }
+  ]
+}
