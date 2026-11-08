@@ -180,11 +180,18 @@ test('hasNode finds node in PATH and in the usual folders', () => {
   const home = tmp('ah-node-');
   const bin = path.join(home, 'bin');
   fs.mkdirSync(bin);
-  assert.equal(connect.hasNode({ platform: 'linux', env: { PATH: bin }, home, shell: false }), fs.existsSync('/usr/bin/node') || fs.existsSync('/usr/local/bin/node') || fs.existsSync('/opt/homebrew/bin/node'));
-  fs.writeFileSync(path.join(bin, 'node'), '');
-  assert.equal(connect.hasNode({ platform: 'linux', env: { PATH: bin }, home, shell: false }), true);
+  const platform = process.platform;
+  const exe = platform === 'win32' ? 'node.exe' : 'node';
+  // Keep Windows' own install folders out of the lookup.
+  const env = (PATH) => ({ PATH, ProgramFiles: home, APPDATA: home, LOCALAPPDATA: home });
+  const found = (PATH) => connect.hasNode({ platform, env: env(PATH), home, shell: false });
+  const systemNode = platform !== 'win32' && ['/usr/bin/node', '/usr/local/bin/node', '/opt/homebrew/bin/node'].some((p) => fs.existsSync(p));
+  assert.equal(found(bin), systemNode);
+  fs.writeFileSync(path.join(bin, exe), '');
+  assert.equal(found(bin), true);
+  fs.rmSync(path.join(bin, exe));
   fs.mkdirSync(path.join(home, '.nvm', 'versions', 'node', 'v22.0.0'), { recursive: true });
-  assert.equal(connect.hasNode({ platform: 'linux', env: { PATH: '' }, home, shell: false }), true);
+  assert.equal(found(''), true);
 });
 
 test('plugin launcher: Node.js first, then the desktop app runtime; hooks fail open without either', { skip: process.platform === 'win32' }, () => {
