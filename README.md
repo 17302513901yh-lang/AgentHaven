@@ -214,7 +214,7 @@ Passwords, API keys, personal project data and local session data do not belong 
 
 ## Contributing
 
-Issues and pull requests are welcome. Run `npm run lint && npm test` before you open a PR, and see [AGENT_NOTES.md](AGENT_NOTES.md) for how the code is laid out.
+Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get set up, and [CHANGELOG.md](CHANGELOG.md) for what changed per version. Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
 
 ## License
 

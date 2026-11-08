@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Website and quickstart
+    url: https://laaielichter.github.io/AgentHaven/
+    about: How AgentHaven works, install steps and the FAQ.
+  - name: Report a security problem
+    url: https://github.com/laaielichter/AgentHaven/security/advisories/new
+    about: Please report security problems privately.

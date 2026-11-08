@@ -1,0 +1,46 @@
+name: Bug report
+description: Something does not work as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: "1. ...\n2. ...\n3. ..."
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: AgentHaven version
+      placeholder: "e.g. 0.3.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: way-in
+    attributes:
+      label: How does the agent connect?
+      options:
+        - Desktop app only
+        - MCP plugin
+        - WORKBOARD.md
+        - HTTP API
+        - Not about an agent
+  - type: input
+    id: env
+    attributes:
+      label: OS and agent / MCP client
+      placeholder: "e.g. Windows 11, Claude Code 2.x"
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Remove API keys and personal paths first.
+      render: shell
