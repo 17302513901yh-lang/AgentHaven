@@ -3,6 +3,10 @@
 All notable changes to AgentHaven. Full notes for each version are in [`docs/releases/`](docs/releases/),
 and the installers are on the [Releases page](https://github.com/laaielichter/AgentHaven/releases).
 
+## Unreleased
+
+- `examples/report_progress.mjs`: the training-loop reporter for Node.js 20+, with no dependencies, next to the Python one. Thanks to @Daiyuanranfeng for this, and for the careful end-to-end test! (#14)
+
 ## 0.5.0
 
 A smarter plugin for agents. [Full notes](docs/releases/v0.5.0.md)
