@@ -157,6 +157,29 @@ function hasClaudePlugin(client) {
   try { return /"agenthaven@/.test(fs.readFileSync(client.plugins, 'utf8')); } catch { return false; }
 }
 
+// Is Node.js installed for the user? A desktop app often starts with a short PATH (macOS
+// apps do not read the shell profile), so look in the usual places and ask the login shell.
+let nodeCache;
+function hasNode({ platform = process.platform, env = process.env, home = os.homedir(), shell = true } = {}) {
+  if (nodeCache !== undefined && shell) return nodeCache;
+  const names = platform === 'win32' ? ['node.exe'] : ['node'];
+  const dirs = (env.PATH || env.Path || '').split(platform === 'win32' ? ';' : ':').filter(Boolean);
+  if (platform === 'win32') dirs.push(path.join(env.ProgramFiles || 'C:\\Program Files', 'nodejs'), path.join(env.APPDATA || '', 'nvm'), path.join(env.LOCALAPPDATA || '', 'Volta', 'bin'));
+  else dirs.push('/opt/homebrew/bin', '/usr/local/bin', '/usr/bin', path.join(home, '.volta', 'bin'), path.join(home, '.local', 'bin'), path.join(home, '.asdf', 'shims'));
+  let found = dirs.some((d) => names.some((n) => exists(path.join(d, n))));
+  if (!found) {
+    for (const root of [path.join(home, '.nvm', 'versions', 'node'), path.join(home, '.local', 'share', 'fnm', 'node-versions')]) {
+      try { if (fs.readdirSync(root).length) found = true; } catch { /* not there */ }
+    }
+  }
+  if (!found && shell && platform !== 'win32') {
+    const r = require('node:child_process').spawnSync(env.SHELL || '/bin/sh', ['-ilc', 'command -v node'], { encoding: 'utf8', timeout: 4000 });
+    found = r.status === 0 && /node/.test(r.stdout || '');
+  }
+  if (shell) nodeCache = found;
+  return found;
+}
+
 const exists = (p) => { try { fs.accessSync(p); return true; } catch { return false; } };
 
 function sameEntry(a, b) {
@@ -171,9 +194,15 @@ function detect({ entryFor, ...opts } = {}) {
   return Object.entries(clients(opts)).map(([id, c]) => {
     const installed = c.detect.some(exists);
     const base = { id, label: c.label, agent: c.agent, file: c.file, installed };
-    if (hasClaudePlugin(c)) return { ...base, installed: true, state: 'plugin' };
     let entry;
     try { entry = currentEntry(c); } catch (err) { return { ...base, state: 'broken-config', error: err.message }; }
+    if (hasClaudePlugin(c)) {
+      // The plugin starts its MCP server with `node`. Without Node.js the app connects Claude
+      // Code itself; once Node.js is there, that second entry is a duplicate.
+      const node = opts.hasNode !== undefined ? opts.hasNode : hasNode(opts);
+      if (node) return { ...base, installed: true, state: 'plugin', duplicate: Boolean(entry) };
+      if (!entry) return { ...base, installed: true, state: 'not-connected', reason: 'The plugin needs Node.js, which is not installed: AgentHaven connects Claude Code through the app.' };
+    }
     if (!entry) return { ...base, state: installed ? 'not-connected' : 'not-installed' };
     const want = entryFor && entryFor(c.agent);
     // Outdated: the command no longer exists (app moved or removed), or it is not the
@@ -193,6 +222,10 @@ function detect({ entryFor, ...opts } = {}) {
 function autoConnect({ entryFor, off = [], repairOnly = false, ...opts }) {
   const results = [];
   for (const c of detect({ entryFor, ...opts })) {
+    if (c.duplicate) {
+      try { uninstall(c.id, opts); results.push({ id: c.id, label: c.label, action: 'deduplicated' }); } catch { /* leave it */ }
+      continue;
+    }
     if (off.includes(c.id) || !['not-connected', 'outdated'].includes(c.state)) continue;
     if (repairOnly && c.state !== 'outdated') continue;
     try {
@@ -226,4 +259,4 @@ function nodeEntryFor(agent, workspace = 'default', { dir = __dirname, platform 
   return serverEntry({ command: process.execPath, script: path.join(dir, '..', 'bin', 'agenthaven.js'), agent, workspace });
 }
 
-module.exports = { stripJsonc, clients, serverEntry, install, uninstall, detect, autoConnect, loadPrefs, savePrefs, nodeEntryFor, NAME };
+module.exports = { hasNode, stripJsonc, clients, serverEntry, install, uninstall, detect, autoConnect, loadPrefs, savePrefs, nodeEntryFor, NAME };

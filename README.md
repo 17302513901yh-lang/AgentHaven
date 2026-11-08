@@ -150,7 +150,7 @@ Other routes: `GET /api/tasks`, `GET|PATCH|DELETE /api/tasks/:id`, `POST /api/ta
 
 ## The Claude Code plugin
 
-The plugin bundles the MCP server above with slash commands and three hooks. It needs Node.js 20 or later on your `PATH`.
+The plugin bundles the MCP server above with slash commands and three hooks. It runs on Node.js 20 or later; without Node.js it uses the runtime built into the [desktop app](#install): the hooks start through it, and the app connects Claude Code's MCP tools itself (and removes that entry again once Node.js is installed, so the tools never show twice).
 
 | Part | What it does |
 |---|---|
