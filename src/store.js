@@ -292,10 +292,52 @@ class Store {
     });
   }
 
+  // One board name per running agent session. Two sessions that ask for the same
+  // name (two Claude Code windows, say) get "name", "name#2", ... so they never
+  // share claims or leases. A name is free again when its session ends
+  // (releaseIdentity) or has been silent for a lease.
+  claimIdentity({ name, session, cwd } = {}) {
+    name = requireText(name, 'name', 90);
+    session = requireText(session, 'session', 100);
+    return this.withLock((data) => {
+      const t0 = Date.now();
+      for (let n = 1; n <= 99; n += 1) {
+        const candidate = n === 1 ? name : `${name}#${n}`;
+        const known = data.agents[candidate];
+        if (known && known.session && known.session !== session && t0 - Date.parse(known.lastSeen || 0) < this.leaseMs) continue;
+        const agent = Store.seen(data, candidate);
+        if (!known) Store.log(data, candidate, 'agent.joined', candidate, { kind: agent.kind, session: n > 1 ? `#${n}` : undefined });
+        agent.session = session;
+        agent.cwd = typeof cwd === 'string' ? cwd.slice(0, 1000) : null;
+        if (n > 1) agent.base = name;
+        return candidate;
+      }
+      throw new ConflictError(`99 sessions already use the name "${name}"`);
+    });
+  }
+
+  releaseIdentity({ name, session } = {}) {
+    if (!name || !session) return false;
+    return this.withLock((data) => {
+      const agent = data.agents[name];
+      if (!agent || agent.session !== session) return false;
+      agent.session = null;
+      return true;
+    });
+  }
+
+  // Agents with a live session, for the editor hooks (which have no MCP session of their own).
+  sessions() {
+    const t0 = Date.now();
+    return Object.values(this.fresh().agents)
+      .filter((a) => a.session && t0 - Date.parse(a.lastSeen || 0) < this.leaseMs)
+      .map((a) => ({ name: a.name, base: a.base || a.name, cwd: a.cwd || null }));
+  }
+
   listAgents() {
     const data = this.fresh();
     const t0 = Date.now();
-    return Object.values(data.agents).map((a) => {
+    return Object.values(data.agents).map(({ session, cwd, ...a }) => {
       const age = t0 - Date.parse(a.lastSeen || 0);
       const doing = data.tasks.filter((t) => t.assignee === a.name && ACTIVE.includes(t.status)).map((t) => ({ id: t.id, title: t.title, status: t.status }));
       return { ...a, role: data.settings.lead === a.name ? 'lead' : undefined, skills: a.skills || [], presence: age < ONLINE_MS ? 'online' : age < IDLE_MS ? 'idle' : 'offline', tasks: doing };

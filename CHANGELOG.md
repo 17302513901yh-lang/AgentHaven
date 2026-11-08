@@ -3,8 +3,15 @@
 All notable changes to AgentHaven. Full notes for each version are in [`docs/releases/`](docs/releases/),
 and the installers are on the [Releases page](https://github.com/laaielichter/AgentHaven/releases).
 
-## Unreleased
+## 0.5.0
 
+A smarter plugin for agents. [Full notes](docs/releases/v0.5.0.md)
+
+- **Claude Code plugin** with slash commands (`/agenthaven:next`, `handoff`, `review`, `status`, `plan`, `dream`) and three hooks: a briefing at session start, a refusal to edit files another agent has claimed, and a nudge to report or hand off before going quiet on a task.
+- **Tool profiles**: sessions start with 19 core tools (43% fewer tokens of tool descriptions); `enable_tools` adds `code`, `review`, `plan`, `team`, `lead` or `dream` on demand, and profiles follow the agent's role.
+- **Tool annotations** (read-only, destructive), **compact results** (about 30% fewer tokens) and `structuredContent` for MCP 2025-06-18 clients.
+- **MCP prompts**: the same six ways of working as slash commands in any client that supports prompts.
+- **One board name per session**: two sessions of the same agent become `name` and `name#2`, with their own claims and leases.
 - `agenthaven --version` (also `-v` and `version`) prints the installed version. Thanks to @Daiyuanranfeng for this, the first outside contribution to AgentHaven! (#11)
 - The README, website, desktop app (*Help*) and `agenthaven serve` now invite people to contribute and to star the project.
 

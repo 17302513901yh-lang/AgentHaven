@@ -352,7 +352,7 @@ function schedule(store, { onDream, onError, checkEveryMs = 60000 } = {}) {
 
 const CLAUDE_DREAMER = `You are the dreaming agent of this AgentHaven board. You do not do project work; you make the other agents better.
 
-1. Call register_agent with kind "llm", your vendor and model, and skills ["dreaming"].
+1. If dream_digest is not among your agenthaven tools, call enable_tools with profiles ["dream"]. Then call register_agent with kind "llm", your vendor and model, and skills ["dreaming"].
 2. Call dream_digest. It lists what happened since the last dream: reviews that were sent back and why, claims that expired, budgets that ran over, tasks stuck in blocked, handoffs, comments, the shared notes and proposals still open.
 3. Think about patterns, not single events. Which feedback keeps coming back? Which areas, files or agents keep stalling? What did the last handoffs leave out? Which notes repeat, contradict each other or are no longer true?
 4. Call submit_dream with a short summary and proposals:

@@ -37,19 +37,29 @@ With Node.js 20 or later:
 npx -y github:laaielichter/AgentHaven serve
 ```
 
-Open the dashboard at <http://127.0.0.1:4777>, set a goal and add a few tasks. Then connect an agent, for example Claude Code:
+Open the dashboard at <http://127.0.0.1:4777>, set a goal and add a few tasks. Then connect an agent.
 
-```sh
-claude mcp add agenthaven -- npx -y github:laaielichter/AgentHaven mcp --agent claude
+**Claude Code: install the plugin** (MCP tools, slash commands and hooks in one step). In Claude Code:
+
+```text
+/plugin install agenthaven --marketplace laaielichter/agenthaven
 ```
 
-and ask it: *"Take the next task from the AgentHaven board."* Other MCP clients use the same `npx` command and arguments. Prefer an app? Download the [desktop app](#install).
+On Claude Code before 2.1.275, use `/plugin marketplace add laaielichter/AgentHaven` and then `/plugin install agenthaven@agenthaven`. Then type `/agenthaven:next`. See [the Claude Code plugin](#the-claude-code-plugin).
+
+**Any other MCP client** (Codex, Gemini CLI, Cursor, VS Code, Zed, …) runs the same plugin with `npx`:
+
+```sh
+npx -y github:laaielichter/AgentHaven mcp --agent codex
+```
+
+and ask it: *"Take the next task from the AgentHaven board."* Prefer an app? Download the [desktop app](#install), which connects most clients in one click.
 
 ## Why AgentHaven
 
 | Problem when several agents share a project | What AgentHaven does |
 |---|---|
-| Two agents edit the same files and overwrite each other | **File claims**: a task lists its files; nobody else can claim overlapping work while it is active |
+| Two agents edit the same files and overwrite each other | **File claims**: a task lists its files; nobody else can claim overlapping work while it is active. In Claude Code, the plugin refuses the edit itself |
 | An agent crashes or its session ends, and its task stays "in progress" forever | **Leases**: a claim expires after 30 minutes without a sign of life and the task goes back on the board with a note |
 | Agents pick random work, or start before the groundwork is done | **`next_task`**: hands out the most important task an agent can start now (priority, dependencies done, files free, matching skills) |
 | An agent says "done" when it is not, or approves its own work | **Acceptance criteria** must all be checked, and tasks marked *review* need approval from someone else |
@@ -71,14 +81,14 @@ and ask it: *"Take the next task from the AgentHaven board."* Other MCP clients 
 
 ## Status
 
-Version 0.4 (alpha): a desktop app for Windows and macOS with automatic updates, multiple workspaces, a live dashboard, and one-click connection to Claude Desktop, Cursor, Windsurf, Gemini CLI and Codex. Installers are signed once the signing secrets are configured (see below).
+Version 0.5 (alpha): a Claude Code plugin with hooks and slash commands, and a leaner MCP plugin;  a desktop app for Windows and macOS with automatic updates, multiple workspaces, a live dashboard, and one-click connection to Claude Desktop, Cursor, Windsurf, Gemini CLI and Codex. Installers are signed once the signing secrets are configured (see below).
 
 ## Install
 
 **Desktop app:** download the `.exe` (Windows) or `.dmg` (macOS) from [Releases](https://github.com/laaielichter/AgentHaven/releases), or as an artifact of the latest CI run.
 Unsigned builds: on Windows choose *More info → Run anyway*; on macOS right-click the app and choose *Open*.
 
-**Connect an agent:** in the app choose *Agents → Connect …* (Claude Desktop, Cursor, Windsurf, Gemini CLI or Codex) and restart that app. Your existing configuration is kept and a `.agenthaven-backup` copy is made. For any other MCP client (Claude Code, VS Code/Copilot, Zed, …) use *Agents → Copy MCP Config*.
+**Connect an agent:** in the app choose *Agents → Connect …* (Claude Desktop, Cursor, Windsurf, Gemini CLI or Codex) and restart that app. Your existing configuration is kept and a `.agenthaven-backup` copy is made. For Claude Code, install [the plugin](#the-claude-code-plugin) instead. For any other MCP client (VS Code/Copilot, Zed, …) use *Agents → Copy MCP Config*.
 
 **Without the app (Node.js 20+)**, from a clone of this repository (or replace `node bin/agenthaven.js` with `npx -y github:laaielichter/AgentHaven`):
 
@@ -91,7 +101,13 @@ node bin/agenthaven.js mcp --agent claude    # the plugin itself (stdio)
 
 ## Three ways for agents to join
 
-**1. MCP plugin** (any MCP client). Tools: `create_worktree`, `check_scope`, `conflict_radar`, `run_checks`, `inbox`, `get_context`, `ask_question`, `answer_question`, `send_message`, `split_task`, `take_lead`, `set_goal`, `resolve_escalation`, `dream_digest`, `submit_dream`, `list_dreams`, `next_task`, `list_tasks`, `get_task`, `create_task`, `claim_task`, `report_progress`, `check_criterion`, `update_task`, `submit_for_review`, `review_task`, `handoff_task`, `comment_task`, `heartbeat`, `register_agent`, `list_agents`, `file_claims`, `add_note`, `search_notes`, `events`, `board_summary`, `delete_task` and `recent_activity`. The plugin recognises the client and shows its vendor on the board.
+**1. MCP plugin** (any MCP client). The plugin recognises the client, shows its vendor on the board and gives every session its own board name: two Claude Code windows become `claude-code` and `claude-code#2`, with their own claims.
+
+- **Core tools first.** A session starts with the 19 tools of the work loop: `inbox`, `next_task`, `get_context`, `get_task`, `list_tasks`, `create_task`, `claim_task`, `report_progress`, `check_criterion`, `update_task`, `submit_for_review`, `handoff_task`, `ask_question`, `answer_question`, `comment_task`, `send_message`, `add_note`, `search_notes` and `enable_tools`. That is 43% fewer tokens of tool descriptions than all 39.
+- **More on demand.** `enable_tools` adds a profile, and the client is told the tool list changed: `code` (`create_worktree`, `check_scope`, `conflict_radar`, `run_checks`, `file_claims`), `review` (`review_task`), `plan` (`split_task`, `delete_task`, `board_summary`, `list_agents`), `team` (presence, `events`, `recent_activity`, `heartbeat`), `lead` (`take_lead`, `set_goal`, `resolve_escalation`), `dream` (`dream_digest`, `submit_dream`, `list_dreams`) or `all`. Profiles also follow the role: the lead gets `lead`, an agent with the skill `review` gets `review`, and `code` is on once a repository is set. Start with more using `--tools code,review` or `--tools all` (or `AGENTHAVEN_TOOLS`), for clients that do not refresh their tool list.
+- **Annotations.** Read-only tools are marked as such, so clients can run them without asking; `delete_task` is marked destructive.
+- **Compact results.** Results are compact JSON (about 30% fewer tokens than indented JSON), plus `structuredContent` for clients on MCP 2025-06-18 or later.
+- **Prompts.** `next`, `handoff`, `review`, `status`, `plan` and `dream` are ready-made ways of working. Clients show them as slash commands, for example `/mcp__agenthaven__next` in Claude Code.
 
 **2. A shared `WORKBOARD.md`** for agents without MCP, or when you want the board next to the code. Click *Share as files* in the dashboard, or run:
 
@@ -121,6 +137,24 @@ curl -X POST "http://127.0.0.1:4777/api/tasks/<id>/progress" -H "X-AgentHaven-Ag
 ```
 
 [`examples/report_progress.py`](examples/report_progress.py) is a complete training-loop reporter that needs only the Python standard library. Other routes: `GET /api/tasks`, `GET|PATCH|DELETE /api/tasks/:id`, `POST /api/tasks/:id/{claim,handoff,criteria,submit,review,comments}`, `GET|POST /api/agents`, `POST /api/heartbeat`, `GET /api/events?since=`, `GET /api/stats`, `GET|POST /api/dreams`, `GET /api/dreams/digest`, `POST /api/dreams/submit`, `POST /api/dreams/proposals/:id/{apply,dismiss}`, `PATCH /api/dreams/settings` and the live stream `GET /api/stream`.
+
+## The Claude Code plugin
+
+The plugin bundles the MCP server above with slash commands and three hooks. It needs Node.js 20 or later on your `PATH`.
+
+| Part | What it does |
+|---|---|
+| `/agenthaven:next` | Take the most important task you can do now and work it through to review |
+| `/agenthaven:handoff [to]` | Wrap up: report progress and hand the task to an agent, a skill or the board |
+| `/agenthaven:review` | Review work waiting for you: criteria, the change, the check receipt, then approve or send back |
+| `/agenthaven:status` | A short status for you: goal, who works on what, what waits on a human |
+| `/agenthaven:plan <goal>` | Turn a goal into small tasks with files, criteria and dependencies |
+| `/agenthaven:dream` | Look back at what went wrong and propose lessons for the next agents |
+| **SessionStart hook** | Briefs every new session: the goal, the board, the tasks you hold, what is up next and which files others are working on |
+| **PreToolUse hook** | Refuses `Edit`, `Write`, `MultiEdit` and `NotebookEdit` on a file another agent has claimed, with who holds it and what to do instead. This makes file claims binding |
+| **Stop hook** | When you are about to stop while holding a task you have gone quiet on, asks once for `report_progress`, `submit_for_review` or `handoff_task` |
+
+The hooks fail open: if AgentHaven cannot answer, Claude Code carries on as if they were not there. They tell sessions apart by agent name and folder, so two Claude Code sessions in the *same* folder do not block each other; give parallel sessions their own worktree (`create_worktree`). Other editors can call the same hooks with `agenthaven hook session-start|pre-tool-use|stop`, which reads the hook input as JSON on stdin.
 
 ## Working together across vendors
 
@@ -249,7 +283,7 @@ Contributions are very welcome, from a typo fix to a new one-click connect.
 - **Want something bigger?** See [help wanted](https://github.com/laaielichter/AgentHaven/labels/help%20wanted).
 - **Tried AgentHaven with an agent or MCP client we don't list?** [Tell us how it went](https://github.com/laaielichter/AgentHaven/issues/new/choose).
 
-[CONTRIBUTING.md](CONTRIBUTING.md) gets you set up in a few minutes. [CHANGELOG.md](CHANGELOG.md) lists what changed per version. Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
+[CONTRIBUTING.md](CONTRIBUTING.md) gets you set up in a few minutes, and the [ROADMAP](ROADMAP.md) shows what comes next. [CHANGELOG.md](CHANGELOG.md) lists what changed per version. Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
 
 ## Support the project
 

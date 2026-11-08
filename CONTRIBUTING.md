@@ -23,7 +23,7 @@ npm run serve              # dashboard at http://127.0.0.1:4777
 npm run app                # the desktop app
 ```
 
-[AGENT_NOTES.md](AGENT_NOTES.md) explains how the code is laid out. `src/store.js` holds the board rules;
+[AGENT_NOTES.md](AGENT_NOTES.md) explains how the code is laid out, and [ROADMAP.md](ROADMAP.md) shows where the project is going. `src/store.js` holds the board rules;
 the MCP plugin (`src/mcp.js`), the HTTP API (`src/server.js`) and `WORKBOARD.md` (`src/workboard.js`) all go
 through it, so a rule changed there applies everywhere.
 
