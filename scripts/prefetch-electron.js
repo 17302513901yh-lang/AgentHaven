@@ -46,9 +46,22 @@ function cacheDir(url) {
 
 const sha256 = (file) => crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 
+// GitHub's CDN once answered 504 for one file for more than five minutes in a row, so keep
+// trying for up to PREFETCH_MINUTES (default 25) per file, in rounds of curl's own retries.
+const BUDGET_MS = (Number(process.env.PREFETCH_MINUTES) || 25) * 60000;
 function curl(url, out) {
-  execFileSync('curl', ['-fsSL', '--retry', '15', '--retry-all-errors', '--retry-delay', '20', '--connect-timeout', '30', '--max-time', '900', '-o', out, url],
-    { stdio: ['ignore', 'inherit', 'inherit'] });
+  const deadline = Date.now() + BUDGET_MS;
+  for (let round = 1; ; round++) {
+    try {
+      execFileSync('curl', ['-fsSL', '--retry', '10', '--retry-all-errors', '--retry-delay', '15', '--connect-timeout', '30', '--max-time', '900', '-o', out, url],
+        { stdio: ['ignore', 'inherit', 'inherit'] });
+      return;
+    } catch (err) {
+      if (Date.now() + 60000 > deadline) throw new Error(`${url}: still failing after ${Math.round(BUDGET_MS / 60000)} min (${err.message.split('\n')[0]})`);
+      console.log(`${path.basename(url)}: round ${round} failed; trying again in 30 s`);
+      execFileSync(process.execPath, ['-e', 'setTimeout(() => {}, 30000)']);
+    }
+  }
 }
 
 function place(name, src) {
@@ -62,8 +75,11 @@ const which = process.argv[2];
 if (!TARGETS[which]) { console.error(`usage: prefetch-electron.js ${Object.keys(TARGETS).join('|')}`); process.exit(2); }
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'electron-prefetch-'));
+// Reuse a SHASUMS256.txt from a restored cache; it came from this same GitHub release.
+const cachedSums = path.join(cacheDir(`${BASE}SHASUMS256.txt`), 'SHASUMS256.txt');
 const sums = path.join(tmp, 'SHASUMS256.txt');
-curl(`${BASE}SHASUMS256.txt`, sums);
+if (fs.existsSync(cachedSums) && /electron-v\S+\.zip/.test(fs.readFileSync(cachedSums, 'utf8'))) fs.copyFileSync(cachedSums, sums);
+else curl(`${BASE}SHASUMS256.txt`, sums);
 const expected = Object.fromEntries(fs.readFileSync(sums, 'utf8').split('\n').map((l) => l.trim().split(/\s+\*?/)).filter((p) => p.length === 2).map(([h, f]) => [f.replace(/^\*/, ''), h]));
 place('SHASUMS256.txt', sums);
 
