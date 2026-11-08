@@ -187,3 +187,27 @@ fieldset{border:1px solid var(--line);border-radius:8px;padding:8px 10px}legend{
 @media (prefers-reduced-motion:reduce){.update-progress>div{transition:none}}
 @media (max-width:640px){.update-banner{padding:10px 12px}.update-banner button{flex:1}.top-right{flex-wrap:wrap}}
 #update-dialog .row{flex-wrap:wrap}#update-dialog .row button{white-space:nowrap}
+
+/* agent connections */
+.connect-btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.connect-btn .dot{width:8px;height:8px;border-radius:50%;background:var(--p3)}
+.connect-btn.on .dot{background:var(--ok)}.connect-btn.warn .dot{background:var(--warn)}
+.connect-banner{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:10px 20px;background:color-mix(in srgb,var(--ok) 12%,var(--panel));border-bottom:1px solid var(--line);font-size:13px}
+.connect-banner[hidden]{display:none}
+#connect-dialog{width:min(640px,94vw)}
+#connect-dialog label.check{display:flex;flex-direction:row;align-items:flex-start;gap:8px;font-size:13px;color:var(--ink)}
+#connect-dialog label.check input{margin-top:3px}
+#connect-dialog .row{flex-wrap:wrap}#connect-dialog .row button{white-space:nowrap}
+.connect-list{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.connect-list li{display:grid;grid-template-columns:auto 1fr auto;gap:4px 10px;align-items:center;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+.connect-list li.off{opacity:.6}
+.connect-list .st{grid-column:2;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.connect-list .st.bad{color:var(--bad)}.connect-list .st.ok{color:var(--ok)}.connect-list .st.warn{color:var(--warn)}
+.connect-list .ic{grid-row:span 2;width:24px;height:24px;display:grid;place-items:center;border-radius:50%;background:var(--soft);font-size:12px}
+.connect-list li.ok .ic{background:color-mix(in srgb,var(--ok) 20%,var(--panel));color:var(--ok)}
+.connect-list .acts{grid-row:span 2;grid-column:3;display:flex;gap:6px}
+.notice{margin:0;padding:8px 10px;border-radius:8px;background:color-mix(in srgb,var(--warn) 14%,var(--panel));font-size:13px}
+.notice[hidden]{display:none}
+.onboard-connect{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.onboard-connect:empty{display:none}
+.inline-btn{padding:2px 10px;font-size:13px}

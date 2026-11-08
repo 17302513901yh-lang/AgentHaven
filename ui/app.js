@@ -718,4 +718,90 @@ if (updates) {
   $('#upd-releases').addEventListener('click', () => updates.openReleases());
 }
 
+// ---- agent connections ---------------------------------------------------------------
+
+const CONN_TEXT = {
+  connected: ['✓', 'Connected', 'ok'], plugin: ['✓', 'Connected through the AgentHaven plugin', 'ok'],
+  outdated: ['↻', 'Points to an old copy of AgentHaven: reconnect', 'warn'], 'not-connected': ['○', 'Installed, not connected', ''],
+  'broken-config': ['!', 'Its MCP settings file cannot be read', 'bad'], 'not-installed': ['·', 'Not found on this computer', ''],
+};
+let conns = null;
+
+function seenAuto() { try { return localStorage.getItem('connectSeen'); } catch { return null; } }
+function markAutoSeen(at) { try { localStorage.setItem('connectSeen', at); } catch { /* storage blocked */ } $('#connect-banner').hidden = true; }
+
+function renderConnections(c) {
+  conns = c;
+  const live = c.clients.filter((x) => ['connected', 'plugin'].includes(x.state));
+  const fix = c.clients.filter((x) => ['outdated', 'not-connected', 'broken-config'].includes(x.state) && !c.off.includes(x.id));
+  const btn = $('#connect-btn');
+  btn.classList.toggle('on', live.length > 0 && !fix.length);
+  btn.classList.toggle('warn', fix.length > 0);
+  $('#connect-label').textContent = live.length ? `${live.length} agent${live.length === 1 ? '' : 's'} connected` : 'Connect agents';
+  btn.title = fix.length ? `${fix.map((x) => x.label).join(', ')}: not connected yet` : 'Agent apps connected to this board';
+
+  $('#connect-summary').textContent = `${live.length} of ${c.clients.filter((x) => x.installed).length} installed`;
+  $('#connect-notice').hidden = !c.notice;
+  $('#connect-notice').textContent = c.notice || '';
+  $('#connect-auto').checked = c.auto && c.managed;
+  $('#connect-auto').disabled = !c.managed;
+  $('#connect-auto-label').textContent = c.managed
+    ? 'Keep my agents connected automatically: connect new agent apps and repair connections after AgentHaven moves or updates'
+    : 'Automatic connection runs in the AgentHaven desktop app. Here, use the buttons or run agenthaven connect.';
+  const order = (x) => (x.installed ? 0 : 1);
+  $('#connect-list').replaceChildren(...[...c.clients].sort((a, b) => order(a) - order(b)).map((x) => {
+    const [icon, text, tone] = CONN_TEXT[x.state] || ['?', x.state, ''];
+    const off = c.off.includes(x.id) && x.state === 'not-connected';
+    const acts = [];
+    if (['not-connected', 'outdated'].includes(x.state)) acts.push(el('button', { type: 'button', textContent: x.state === 'outdated' ? 'Reconnect' : 'Connect', onclick: () => connCall('POST', { client: x.id }, `${x.label} connected. Restart it once.`) }));
+    if (x.state === 'not-installed') acts.push(el('button', { type: 'button', className: 'ghost', textContent: 'Connect anyway', title: 'Write the config even though the app was not found', onclick: () => connCall('POST', { client: x.id }, `${x.label} connected.`) }));
+    if (['connected', 'outdated'].includes(x.state)) acts.push(el('button', { type: 'button', className: 'ghost', textContent: 'Disconnect', onclick: () => connCall('DELETE', x.id, `${x.label} disconnected. AgentHaven will not reconnect it by itself.`) }));
+    return el('li', { className: `${tone}${off ? ' off' : ''}` },
+      el('span', { className: 'ic', textContent: icon }),
+      el('strong', { textContent: x.label }),
+      el('div', { className: 'acts' }, acts),
+      el('span', { className: `st ${tone}`, textContent: off ? 'Disconnected by you' : x.state === 'broken-config' ? `${text}: fix it, then reconnect` : text, title: x.error || x.file }));
+  }));
+
+  // First-run card: the installed apps as chips.
+  $('#onboard-connect').replaceChildren(...c.clients.filter((x) => x.installed).map((x) => el('span', { className: 'chip', textContent: `${(CONN_TEXT[x.state] || ['?'])[0]} ${x.label}` })));
+  $('#onboard-connect-all').hidden = !fix.length && live.length > 0;
+
+  // After AgentHaven connected apps by itself: say so once.
+  const done = (c.lastAuto?.results || []).filter((r) => r.action !== 'error');
+  const show = done.length > 0 && seenAuto() !== c.lastAuto.at;
+  $('#connect-banner').hidden = !show;
+  if (show) {
+    const names = done.map((r) => r.label);
+    $('#connect-banner-title').textContent = `AgentHaven ${done.some((r) => r.action === 'connected') ? 'connected itself to' : 'repaired the connection with'} ${names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names.at(-1)}` : names[0]}`;
+    $('#connect-banner-detail').textContent = 'Restart those apps once to load the AgentHaven tools, then ask: "Take the next task from the AgentHaven board."';
+  }
+}
+
+async function loadConnections() {
+  try { renderConnections(await api('/api/connections')); } catch { /* older server */ }
+}
+
+async function connCall(method, arg, okText) {
+  $('#connect-msg').textContent = 'Working…';
+  try {
+    const r = method === 'DELETE' ? await api(`/api/connections/${encodeURIComponent(arg)}`, { method })
+      : await api('/api/connections', { method, body: arg });
+    renderConnections(r);
+    const errors = (r.results || []).filter((x) => x.action === 'error');
+    const done = (r.results || []).filter((x) => x.action !== 'error');
+    $('#connect-msg').textContent = errors.length ? errors.map((x) => `${x.label}: ${x.error}`).join(' ')
+      : okText || (done.length ? `Connected ${done.map((x) => x.label).join(', ')}. Restart them once.` : 'Every installed agent app is already connected.');
+  } catch (err) { $('#connect-msg').textContent = err.message; }
+}
+
+$('#connect-btn').addEventListener('click', () => { $('#connect-msg').textContent = ''; loadConnections(); $('#connect-dialog').showModal(); });
+$('#connect-all').addEventListener('click', () => connCall('POST', { all: true }));
+$('#onboard-connect-all').addEventListener('click', () => { connCall('POST', { all: true }); $('#connect-dialog').showModal(); });
+$('#connect-auto').addEventListener('change', (e) => connCall('PATCH', { auto: e.target.checked }, e.target.checked ? 'AgentHaven keeps your agents connected.' : 'Automatic connection is off.'));
+$('#connect-banner-ok').addEventListener('click', () => markAutoSeen(conns.lastAuto.at));
+$('#connect-banner-show').addEventListener('click', () => { markAutoSeen(conns.lastAuto.at); $('#connect-dialog').showModal(); });
+loadConnections();
+setInterval(() => { if (!document.hidden) loadConnections(); }, 60000);
+
 loadWorkspaces().then(() => { connect(); return refresh(true); }).catch(showError);

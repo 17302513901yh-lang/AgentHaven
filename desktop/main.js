@@ -35,6 +35,29 @@ function createWindow() {
   win.loadURL(url);
 }
 
+// Connect agents automatically from the installed app only, and only from a place it stays:
+// a path inside a mounted .dmg or a translocated copy would break after the next restart.
+function connectionSettings() {
+  const exe = process.execPath;
+  const temporary = process.platform === 'darwin' && (/^\/Volumes\//.test(exe) || /AppTranslocation/.test(exe));
+  return {
+    entryFor: (agent) => entry(agent),
+    auto: app.isPackaged && !temporary,
+    notice: !app.isPackaged ? 'Development build: agents are not connected automatically. Use Connect to try it.'
+      : temporary ? 'Move AgentHaven to the Applications folder first, then open it again: agents are connected automatically from there.' : null,
+  };
+}
+
+function connectAll() {
+  const results = connect.autoConnect({ entryFor: entry });
+  const done = results.filter((r) => r.action !== 'error').map((r) => r.label);
+  const failed = results.filter((r) => r.action === 'error');
+  dialog.showMessageBox(win, {
+    message: done.length ? `AgentHaven connected to ${done.join(', ')}` : failed.length ? 'Some agents could not be connected' : 'All installed agents are already connected',
+    detail: [done.length ? 'Restart those apps once to load the AgentHaven tools.' : '', ...failed.map((r) => `${r.label}: ${r.error}`)].filter(Boolean).join('\n'),
+  });
+}
+
 function installInto(clientId, agent) {
   try {
     const client = connect.install(clientId, entry(agent));
@@ -60,13 +83,18 @@ function buildMenu() {
     ] },
     { role: 'editMenu' },
     { label: 'Agents', submenu: [
+      { label: 'Connect All Installed Agents', click: () => connectAll() },
+      { type: 'separator' },
       { label: 'Connect Claude Desktop', click: () => installInto('claude', 'claude') },
       { label: 'Connect Cursor', click: () => installInto('cursor', 'cursor') },
+      { label: 'Connect Claude Code', click: () => installInto('claude-code', 'claude-code') },
+      { label: 'Connect VS Code (Copilot)', click: () => installInto('vscode', 'copilot') },
       { label: 'Connect Windsurf', click: () => installInto('windsurf', 'windsurf') },
       { label: 'Connect Gemini CLI', click: () => installInto('gemini', 'gemini') },
       { label: 'Connect Codex', click: () => installInto('codex', 'codex') },
+      { label: 'Connect LM Studio', click: () => installInto('lmstudio', 'lmstudio') },
       { type: 'separator' },
-      { label: 'Copy MCP Config (Claude Code, VS Code, Copilot, Zed, …)', click: () => copyConfig('agent') },
+      { label: 'Copy MCP Config (Zed, JetBrains, other clients…)', click: () => copyConfig('agent') },
     ] },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
@@ -169,7 +197,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.whenReady().then(async () => {
-    ({ url } = await start({ dataDir: defaultDataDir() }));
+    ({ url } = await start({ dataDir: defaultDataDir(), connections: connectionSettings() }));
     buildMenu();
     createWindow();
     setupUpdates();
