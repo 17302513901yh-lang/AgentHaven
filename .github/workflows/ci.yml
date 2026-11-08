@@ -79,13 +79,19 @@ jobs:
           extra=""
           if [ -z "$CSC_LINK" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; unset CSC_LINK CSC_KEY_PASSWORD; fi
           if [ "${{ matrix.name }}" = macos ] && [ -n "$APPLE_ID" ] && [ -n "$CSC_LINK" ]; then extra="-c.mac.notarize=true"; fi
+          # electron-builder's helper tools (NSIS, win-codesign, dmg tools) also come from GitHub
+          # releases. Route them through a local mirror that retries GitHub patiently; electron-builder
+          # still checks every file against its built-in checksums.
+          node scripts/retry-mirror.js 8765 > retry-mirror.log 2>&1 &
+          export ELECTRON_BUILDER_BINARIES_MIRROR=http://127.0.0.1:8765/ ELECTRON_BUILDER_BINARIES_ALLOW_HTTP=true
+          sleep 1
           # electron-builder downloads its tools (NSIS, dmg-builder) while it builds; a 5xx from that
           # mirror once blocked a release. Retry twice; a real build error fails all three tries.
           for try in 1 2 3; do
             # The prefetch step already verified the zips against SHASUMS256.txt, so skip the
             # second check: it would download SHASUMS256.txt again and could hit the same outage.
             npm run ${{ matrix.script }} -- $extra -c.electronDownload.isVerifyChecksum=false && break
-            if [ "$try" = 3 ]; then exit 1; fi
+            if [ "$try" = 3 ]; then cat retry-mirror.log; exit 1; fi
             echo "Build attempt $try failed; retrying in $((try * 45)) s"; sleep $((try * 45))
           done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
