@@ -74,6 +74,10 @@ function card(task) {
     task.escalated ? el('span', { className: 'tag bad', title: task.escalated.reason, textContent: '⚠ escalated' }) : null,
     task.children ? el('span', { className: `tag ${task.children.done === task.children.total ? 'ok' : ''}`, title: 'Subtasks done', textContent: `⑂ ${task.children.done}/${task.children.total}` }) : null,
     task.status === 'review' && task.reviewer ? el('span', { className: 'tag info', title: 'Reviewer', textContent: `👀 ${task.reviewer}` }) : null,
+    task.lastReceipt ? el('span', { className: `tag ${task.lastReceipt.status === 'passed' ? 'ok' : task.lastReceipt.status === 'failed' ? 'bad' : 'info'}`, title: `AgentHaven checks on ${task.lastReceipt.sha.slice(0, 10)}`, textContent: task.lastReceipt.status === 'passed' ? '✔ checks' : task.lastReceipt.status === 'failed' ? '✗ checks' : '⏳ checks' }) : null,
+    task.scope && !task.scope.ok ? el('span', { className: 'tag warn', title: [...task.scope.outOfScope, ...task.scope.foreign.flatMap((f) => f.files)].join(', '), textContent: '⚠ scope' }) : null,
+    task.protectedTouched?.length ? el('span', { className: 'tag bad', title: `Protected paths changed: ${task.protectedTouched.join(', ')}`, textContent: '🛡 tests changed' }) : null,
+    task.worktree ? el('span', { className: 'tag', title: `${task.worktree.branch}\n${task.worktree.path}`, textContent: '⎇ branch' }) : null,
     task.parent ? el('span', { className: 'tag', title: `Subtask of ${tasks.find((x) => x.id === task.parent)?.title || task.parent}`, textContent: '↳ sub' }) : null,
     task.usage.costUsd || task.usage.tokens ? el('span', { className: `tag ${task.budget ? 'warn' : ''}`, title: 'Spent', textContent: task.usage.costUsd ? money(task.usage.costUsd) + (task.budget?.costUsd !== undefined ? `/${money(task.budget.costUsd)}` : '') : `${tokens(task.usage.tokens)} tok` }) : null,
     task.leaseUntil ? el('span', { className: 'tag', title: `Claim expires ${new Date(task.leaseUntil).toLocaleTimeString()} without activity`, textContent: `⏱ ${until(task.leaseUntil)}` }) : null,
@@ -115,11 +119,11 @@ function column(status) {
 
 function renderStats(s) {
   const chip = (label, value, title) => el('span', { className: 'chip', title: title || label }, el('b', { textContent: value }), label);
-  $('#stats').replaceChildren(
+  $('#stats').replaceChildren(...[
     chip('doing', s.counts.doing), chip('to do', s.counts.todo), chip('review', s.counts.review),
     s.counts.blocked ? chip('blocked', s.counts.blocked) : null, chip('done', s.counts.done),
     s.escalated ? chip('escalated', `⚠ ${s.escalated}`) : null, s.openQuestions ? chip('open questions', `❓ ${s.openQuestions}`) : null,
-    chip('agents online', `${s.online}/${s.agents}`), chip('spent', money(s.usage.costUsd), `${tokens(s.usage.tokens)} tokens`));
+    chip('agents online', `${s.online}/${s.agents}`), chip('spent', money(s.usage.costUsd), `${tokens(s.usage.tokens)} tokens`)].filter(Boolean));
 }
 
 function renderAgents() {
@@ -154,6 +158,8 @@ async function render() {
   $('#activity').replaceChildren(...(activity.length ? activity.map((e) => el('li', {}, el('strong', { textContent: e.actor }), ` ${e.action.replace(/^task\./, '').replace(/[._]/g, ' ')} `, e.ref?.startsWith('task_') ? el('code', { textContent: tasks.find((x) => x.id === e.ref)?.title || e.ref }) : null, ' ', el('span', { className: 'm', textContent: ago(e.at) })))
     : [el('li', { className: 'empty', textContent: 'Nothing yet.' })]));
   await renderDreams();
+  await renderGuard();
+  await renderCode();
   statusEl.textContent = live ? 'Live' : 'Polling';
   statusEl.classList.remove('err');
 }
@@ -256,7 +262,7 @@ function fillDialog(task) {
   const comments = task.comments || [];
   const openQ = qs.filter((q) => !q.answer).length;
   $('#tab-comments-n').textContent = comments.length || openQ ? `${comments.length}${openQ ? ` · ❓${openQ}` : ''}` : '';
-  $('#dlg-comments').replaceChildren(...(comments.length ? comments.map((c) => el('li', { className: `k-${c.kind || 'comment'}` }, el('span', { className: 'm', textContent: `${c.actor} · ${ago(c.at)}${c.kind ? ` · ${c.kind.replace(/-/g, ' ')}` : ''}` }), el('div', { className: 'body', textContent: c.body })))
+  $('#dlg-comments').replaceChildren(...(comments.length ? comments.map((c) => el('li', { className: `k-${c.kind || 'comment'}${c.body.startsWith('[⚠') ? ' flagged' : ''}` }, el('span', { className: 'm', textContent: `${c.actor} · ${ago(c.at)}${c.kind ? ` · ${c.kind.replace(/-/g, ' ')}` : ''}` }), el('div', { className: 'body', textContent: c.body })))
     : [el('li', { className: 'empty', textContent: 'No comments yet.' })]));
   $('#comment-new').disabled = isNew; $('#comment-add').disabled = isNew;
 
@@ -266,6 +272,19 @@ function fillDialog(task) {
     el('div', { className: 'kpi' }, el('div', { className: 'm', textContent: 'Cost' }), el('div', { className: 'v', textContent: money(usage.costUsd) }), task.budget?.costUsd !== undefined ? el('div', { className: 'm', textContent: `budget ${money(task.budget.costUsd)}` }) : null),
     el('div', { className: 'kpi' }, el('div', { className: 'm', textContent: 'Tokens' }), el('div', { className: 'v', textContent: tokens(usage.tokens) }), task.budget?.tokens !== undefined ? el('div', { className: 'm', textContent: `budget ${tokens(task.budget.tokens)}` }) : null),
     el('div', { className: 'kpi' }, el('div', { className: 'm', textContent: 'Claim' }), el('div', { className: 'v', textContent: task.leaseUntil ? until(task.leaseUntil) : '—' }), el('div', { className: 'm', textContent: task.assignee || 'unassigned' }))));
+  const receipts = (task.receipts || []).slice().reverse();
+  const sc = task.scope;
+  $('#dlg-code').replaceChildren(...[
+    task.worktree ? el('div', { className: 'm', textContent: `Branch ${task.worktree.branch} · ${task.worktree.path}` }) : null,
+    sc ? el('div', { className: `receipt ${sc.ok ? 'passed' : 'failed'}` }, el('strong', { textContent: sc.ok ? `Scope OK: ${sc.changed.length} changed file(s), all inside the task` : 'Scope warning' }),
+      sc.outOfScope.length ? el('div', { textContent: `Outside the task: ${sc.outOfScope.join(', ')}` }) : null,
+      ...sc.foreign.map((f) => el('div', { textContent: `${f.files.join(', ')} belong(s) to ${f.agent} ("${f.title}")` })), el('div', { className: 'm', textContent: ago(sc.at) })) : null,
+    task.protectedTouched?.length ? el('div', { className: 'receipt failed' }, el('strong', { textContent: '🛡 Protected paths changed: a human must approve' }), el('div', { textContent: task.protectedTouched.join(', ') })) : null,
+    ...receipts.slice(0, 3).map((r) => el('div', { className: `receipt ${r.status}` },
+      el('strong', { textContent: `Checks ${r.status} on ${r.sha.slice(0, 10)}${r.dirty ? ' (with uncommitted changes)' : ''}` }), el('span', { className: 'm', textContent: ` · ${ago(r.finishedAt || r.startedAt)} · started by ${r.by}` }),
+      ...(r.results || []).map((x) => el('div', {}, `${x.exitCode === 0 ? '✔' : '✗'} ${x.name} `, el('span', { className: 'm', textContent: `exit ${x.exitCode} · ${(x.durationMs / 1000).toFixed(1)}s` }), x.exitCode !== 0 ? el('pre', { textContent: x.tail.slice(-1500) }) : null)))),
+    task.id && task.status !== 'done' && task.worktree ? el('button', { type: 'button', className: 'ghost', textContent: 'Run checks now', onclick: () => act(() => api(`/api/tasks/${task.id}/checks`, { method: 'POST', body: {} })) }) : null,
+  ].filter(Boolean));
   const metrics = Object.entries(task.metrics || {}).filter(([, pts]) => Array.isArray(pts));
   $('#dlg-metrics').replaceChildren(...(metrics.length ? metrics.map(([k, pts]) => el('div', { className: 'metric' }, el('div', { className: 'm', textContent: `${k} · ${pts.length} points` }), el('div', { className: 'v', textContent: fmt(pts[pts.length - 1].v) }), sparkline(pts)))
     : [el('p', { className: 'm', textContent: 'No metrics reported. Agents and training jobs send them with report_progress (e.g. loss, accuracy, tests passed).' })]));
@@ -424,6 +443,52 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'n') { e.preventDefault(); $('#task-title').focus(); }
   if (e.key === '/') { e.preventDefault(); $('#filter').focus(); }
 });
+
+// ---- code and checks -------------------------------------------------------------------
+
+async function renderCode() {
+  const c = await api('/api/code');
+  $('#code-summary').textContent = c.repo ? `${c.repo.path.split(/[\\/]/).pop()} · ${c.checks.length} check(s)` : 'Repository and checks (not set)';
+  $('#radar-run').hidden = !c.repo;
+  if (!$('#code-edit').open) {
+    $('#code-repo').value = c.repo?.path || '';
+    $('#code-base').value = c.repo?.base || '';
+    $('#code-checks').value = c.checks.map((x) => x.command).join('\n');
+    $('#code-protected').value = c.protected.join('\n');
+  }
+}
+$('#code-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const repo = $('#code-repo').value.trim();
+  const lines = (s) => s.split('\n').map((x) => x.trim()).filter(Boolean);
+  const ok = await act(async () => {
+    if (repo) await api('/api/code/repo', { method: 'PUT', body: { dir: repo, base: $('#code-base').value.trim() || undefined } });
+    const cmds = lines($('#code-checks').value);
+    await api('/api/code/checks', { method: 'PUT', body: { checks: cmds.map((command, i) => ({ name: cmds.length > 1 ? `check ${i + 1}` : 'checks', command })), protectedPaths: lines($('#code-protected').value) } });
+  });
+  if (ok) $('#code-edit').open = false;
+});
+$('#radar-run').addEventListener('click', async () => {
+  try {
+    const r = await api('/api/radar');
+    $('#radar').replaceChildren(...(r.conflicts.length ? r.conflicts.map((c) => el('li', {}, el('strong', { textContent: `⚠ ${c.files.join(', ')}` }), ` · ${c.a.agent} (${c.a.title}) and ${c.b.agent} (${c.b.title})`))
+      : [el('li', { className: 'empty', textContent: `${r.branches.length} active branch(es), no overlapping changes.` })]));
+  } catch (err) { showError(err); }
+});
+
+// ---- guard -------------------------------------------------------------------------
+
+async function renderGuard() {
+  const g = await api('/api/guard?limit=8');
+  $('#guard-section').hidden = !g.events.length && !g.quarantined.length;
+  $('#quarantine').replaceChildren(...g.quarantined.map((n) => el('li', { className: 'proposal' },
+    el('span', { className: 'kind', textContent: `Quarantined · ${n.author}` }), el('strong', { textContent: n.title }), el('span', { className: 'body', textContent: n.body }),
+    el('span', { className: 'm', textContent: (n.reasons || []).join('; ') }),
+    el('span', { className: 'row' },
+      el('button', { type: 'button', className: 'ghost', textContent: 'Release', title: 'It is fine: show it to agents', onclick: () => act(() => api(`/api/notes/${n.id}/release`, { method: 'POST', body: {} })) }),
+      el('button', { type: 'button', className: 'danger', textContent: 'Remove', onclick: () => act(() => api(`/api/notes/${n.id}/remove`, { method: 'POST', body: {} })) })))));
+  $('#guard-log').replaceChildren(...g.events.map((e) => el('li', {}, el('strong', { textContent: e.secrets.length ? `🔑 ${e.secrets.join(', ')} removed` : '⚠ flagged' }), ` · ${e.actor} in ${e.where} `, el('span', { className: 'm', textContent: ago(e.at) }))));
+}
 
 // ---- team, goal and the human inbox ------------------------------------------------
 

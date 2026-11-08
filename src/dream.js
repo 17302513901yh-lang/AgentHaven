@@ -20,6 +20,7 @@
 // tools dream_digest and submit_dream.
 const crypto = require('node:crypto');
 const path = require('node:path');
+const { inspect, MARK } = require('./guard');
 const { Store, ValidationError, NotFoundError, ConflictError, overlaps, normFile } = require('./store');
 
 const KINDS = ['lesson', 'task', 'merge-notes', 'retire-note', 'agent-tip'];
@@ -87,7 +88,7 @@ function digest(store, { since } = {}) {
   const stuck = data.tasks.filter((t) => t.status === 'blocked' && t0 - Date.parse(t.updatedAt) > STUCK_MS)
     .map((t) => ({ ...brief(t), blockedReason: t.blockedReason, since: t.updatedAt }));
   const comments = events.filter((e) => e.action === 'task.commented').slice(-100).map((e) => ({ at: e.at, actor: e.actor, task: e.ref, text: e.detail }));
-  const notes = data.notes.map((n) => ({ id: n.id, title: n.title, body: n.body.slice(0, 2000), tags: n.tags, author: n.author, createdAt: n.createdAt }));
+  const notes = data.notes.filter((n) => !n.quarantined).map((n) => ({ id: n.id, title: n.title, body: n.body.slice(0, 2000), tags: n.tags, author: n.author, createdAt: n.createdAt }));
   return {
     since: from, until: data.seq, events: events.length,
     sentBack, expired, overBudget, approved, handoffs, stuck, comments, notes,
@@ -187,7 +188,12 @@ function heuristicProposals(d) {
 function cleanProposal(p, data) {
   if (!p || typeof p !== 'object') throw new ValidationError('each proposal must be an object');
   if (!KINDS.includes(p.kind)) throw new ValidationError(`proposal kind must be one of ${KINDS.join(', ')}`);
-  const out = { id: newId('prop'), kind: p.kind, title: text(p.title, 'proposal title', 200), body: text(p.body, 'proposal body', 5000), status: 'proposed',
+  // Dreams write into shared memory, so they pass the same Guard as everything else.
+  const g = (v, field, max) => { const r = inspect(text(v, field, max)); return { t: r.injection.length ? MARK + r.text : r.text, flags: r.injection, secrets: r.secrets }; };
+  const gt = g(p.title, 'proposal title', 200);
+  const gb = g(p.body, 'proposal body', 5000);
+  const flags = [...gt.flags, ...gb.flags];
+  const out = { id: newId('prop'), kind: p.kind, title: gt.t, body: gb.t, status: 'proposed', ...(flags.length ? { flags } : {}),
     evidence: Array.isArray(p.evidence) ? p.evidence.map(String).slice(0, 30) : [] };
   if (p.kind === 'lesson') {
     const scope = p.scope || {};
@@ -222,7 +228,7 @@ function recordDream(store, { actor, summary, proposals, since, until }) {
     Store.log(data, actor, 'dream.recorded', d.id, `${d.proposals.length} proposal(s)`);
     return d;
   });
-  if (cfg.autoApply) for (const p of dream.proposals) { try { applyProposal(store, p.id, { actor: 'agenthaven' }); } catch { /* left proposed */ } }
+  if (cfg.autoApply) for (const p of dream.proposals.filter((x) => !x.flags)) { try { applyProposal(store, p.id, { actor: 'agenthaven' }); } catch { /* left proposed */ } }
   return listDreams(store, { limit: 1 })[0];
 }
 
@@ -255,6 +261,7 @@ function applyProposal(store, id, { actor }) {
     if (actor !== 'agenthaven' && !Store.isAuthority(data, actor)) throw new ConflictError('only a human applies dream proposals (or turn on auto-apply)');
     const { p } = findProposal(data, id);
     if (p.status !== 'proposed') throw new ConflictError(`proposal is already ${p.status}`);
+    if (p.flags && !Store.isHuman(data, actor)) throw new ConflictError('Guard flagged this proposal; only a human applies it');
     const note = (title, body, tags, extra = {}) => {
       const n = { id: newId('note'), title, body, tags, author: actor === 'agenthaven' ? 'dreamer' : actor, createdAt: now(), ...extra };
       data.notes.push(n);
@@ -304,7 +311,7 @@ function dismissProposal(store, id, { actor, reason }) {
 // The lessons that apply to a task: same files or folders, same skills, words in
 // common, or tips for the agent working on it.
 function lessonsFor(store, task, { agent } = {}) {
-  const lessons = store.read().notes.filter((n) => n.tags.includes('lesson'));
+  const lessons = store.read().notes.filter((n) => n.tags.includes('lesson') && !n.quarantined);
   const scored = [];
   for (const n of lessons) {
     const scope = n.scope || { files: [], skills: [] };

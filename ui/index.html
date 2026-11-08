@@ -57,6 +57,27 @@
       <div class="row"><h2 id="inbox-h" class="grow">Your inbox</h2><span id="inbox-count" class="chip" hidden></span></div>
       <ul id="inbox" class="list"></ul>
     </section>
+    <section aria-labelledby="guard-h" class="guard" id="guard-section" hidden>
+      <h2 id="guard-h">Guard</h2>
+      <p class="m">Secrets are removed before they are stored. Notes that read like instructions to other agents wait here until you release them.</p>
+      <ul id="quarantine" class="list"></ul>
+      <ul id="guard-log" class="list small"></ul>
+    </section>
+    <section aria-labelledby="code-h">
+      <div class="row"><h2 id="code-h" class="grow">Code &amp; checks</h2><button type="button" id="radar-run" class="ghost" title="Files changed on more than one active branch">Conflict radar</button></div>
+      <ul id="radar" class="list small"></ul>
+      <details id="code-edit">
+        <summary id="code-summary">Repository and checks</summary>
+        <form id="code-form" class="stack">
+          <label>Repository (absolute path) <input id="code-repo" placeholder="/Users/you/projects/app"></label>
+          <label>Base branch <input id="code-base" placeholder="main (detected)"></label>
+          <label>Checks AgentHaven runs before approval (one command per line) <textarea id="code-checks" rows="3" placeholder="npm test&#10;npm run lint"></textarea></label>
+          <label>Protected paths: changes need a human's approval <textarea id="code-protected" rows="3"></textarea></label>
+          <button type="submit">Save</button>
+          <p class="m">Only people can change these. Agents run the checks, they cannot change them.</p>
+        </form>
+      </details>
+    </section>
     <section aria-labelledby="team-h">
       <h2 id="team-h">Team</h2>
       <div class="stack">
@@ -168,6 +189,7 @@
     </div>
     <div class="tab" data-panel="metrics" hidden>
       <div id="dlg-progress"></div>
+      <div id="dlg-code" class="code-box"></div>
       <div id="dlg-metrics" class="metrics"></div>
     </div>
     <div class="tab" data-panel="history" hidden>
