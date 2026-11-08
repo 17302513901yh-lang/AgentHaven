@@ -1,0 +1,62 @@
+name: Publish release
+
+# CI leaves every release as a draft. This publishes one when the owner decides,
+# so the desktop app's automatic updates and the download links pick it up.
+# Run it from the Actions tab, also in the GitHub app on a phone:
+# Actions → Publish release → Run workflow.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Version tag to publish, e.g. v0.5.0. Leave empty for the version in package.json.
+        required: false
+        default: ''
+      delete_older_drafts:
+        description: Delete older drafts that were never published
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Publish the draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG_INPUT: ${{ inputs.tag }}
+          DELETE_OLDER: ${{ inputs.delete_older_drafts }}
+        run: |
+          set -euo pipefail
+          tag="${TAG_INPUT:-v$(node -p "require('./package.json').version")}"
+          if ! [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then echo "::error::Not a version tag: $tag"; exit 1; fi
+
+          releases=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,isDraft)
+          state=$(jq -r --arg t "$tag" '[.[] | select(.tagName == $t)][0].isDraft // "missing"' <<<"$releases")
+          if [ "$state" = missing ]; then echo "::error::No release $tag yet. Wait for the CI run on main to finish."; exit 1; fi
+
+          if [ "$state" = true ]; then
+            # Publishing without the installers and update files would break automatic updates.
+            assets=$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '[.assets[].name] | join(" ")')
+            for need in latest.yml latest-mac.yml .exe .dmg; do
+              if [[ " $assets" != *"$need"* ]]; then echo "::error::$tag has no $need yet: $assets"; exit 1; fi
+            done
+            gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --draft=false --latest
+            echo "Published $tag"
+          else
+            echo "$tag is already published"
+          fi
+
+          if [ "$DELETE_OLDER" = true ]; then
+            for old in $(jq -r --arg t "$tag" '.[] | select(.isDraft and .tagName != $t) | .tagName' <<<"$releases"); do
+              gh release delete "$old" --repo "$GITHUB_REPOSITORY" --yes
+              echo "Deleted the unpublished draft $old (its git tag is kept)"
+            done
+          fi
+          echo "### Published [$tag](https://github.com/$GITHUB_REPOSITORY/releases/tag/$tag)" >> "$GITHUB_STEP_SUMMARY"

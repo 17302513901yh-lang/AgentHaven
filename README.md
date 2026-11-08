@@ -257,7 +257,7 @@ npm run dist:win           # or dist:mac — installer in dist/
 
 ## Releasing and signing
 
-Pushing a tag `vX.Y.Z` (matching `version` in `package.json`) builds the installers and creates a draft release. Publish that release; automatic updates read `latest.yml` / `latest-mac.yml` from the published release.
+Pushing a tag `vX.Y.Z` (matching `version` in `package.json`) builds the installers and creates a draft release. Publish that release; automatic updates read `latest.yml` / `latest-mac.yml` from the published release. A merge to `main` that raises the version does the same. To publish, run **Actions → Publish release → Run workflow** (also from the GitHub app on a phone): it checks that the installers and update files are attached, publishes the draft as the latest release, and deletes older drafts that were never published.
 
 Repository secrets for signing (optional; without them builds are unsigned):
 
