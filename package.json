@@ -1,7 +1,7 @@
 {
   "name": "agenthaven",
-  "version": "0.2.0",
-  "description": "One local shared workspace for all your AI agents: task board, project memory and handoffs, with an MCP agent plugin.",
+  "version": "0.3.0",
+  "description": "One local work board for AI agents from every vendor: claims with leases, dependencies, review gates, progress, cost and metrics, via MCP, a shared WORKBOARD.md or HTTP.",
   "license": "MIT",
   "author": "AgentHaven contributors",
   "homepage": "https://laaielichter.github.io/AgentHaven/",
@@ -13,14 +13,15 @@
   "files": [
     "bin",
     "src",
-    "ui"
+    "ui",
+    "examples"
   ],
   "engines": {
     "node": ">=20"
   },
   "scripts": {
     "test": "node --test",
-    "lint": "node --check src/store.js && node --check src/mcp.js && node --check src/server.js && node --check src/connect.js && node --check bin/agenthaven.js && node --check desktop/main.js && node --check ui/app.js",
+    "lint": "node --check src/store.js && node --check src/workboard.js && node --check src/mcp.js && node --check src/server.js && node --check src/connect.js && node --check bin/agenthaven.js && node --check desktop/main.js && node --check ui/app.js",
     "serve": "node bin/agenthaven.js serve",
     "mcp": "node bin/agenthaven.js mcp",
     "app": "electron .",

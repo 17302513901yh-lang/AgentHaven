@@ -2,9 +2,12 @@
 
 ## Structure
 - `src/store.js` core (no deps): one JSON file per workspace, atomic write (tmp + rename), lock via `mkdir <file>.lock` (stale after 10 s), activity log capped at 5000. File claims: active tasks (doing/blocked/review) with an assignee block overlapping paths (equal or folder prefix) for other agents.
-- `src/mcp.js` MCP server over stdio, hand-written (newline JSON-RPC); no SDK.
+- Board model (schema 2, old files upgrade on read): leases (`leaseUntil`, reaped inside `withLock` and by `fresh()`), `dependsOn` (cycle check), `priority` 0-3, `skills`, `criteria`, `review`, `progress`/`usage`/`metrics`/`budget`, `comments`, `agents` registry, `seq` cursor on the log. Only the assignee or a human (`you` or kind `human`) may change a claimed task.
+- `src/workboard.js` WORKBOARD.md (generated view + `## Inbox` command lines) and append-only LOGBOOK.md; `syncOnce` keeps Inbox lines added during a sync. Linked folder lives in workspace `settings.workboardDir`; `server.js` resumes the watchers on start.
+- `src/mcp.js` MCP server over stdio, hand-written (newline JSON-RPC); no SDK. Registers the client with a vendor guessed from `clientInfo.name`.
 - `src/server.js` HTTP API + `ui/` dashboard, 127.0.0.1 only, Host/Origin check. Workspace via `?workspace=`.
-- `src/connect.js` merges the MCP entry into Claude Desktop/Cursor/Windsurf configs (backup, refuses invalid JSON).
+- `src/connect.js` merges the MCP entry into Claude Desktop/Cursor/Windsurf/Gemini CLI JSON configs (backup, refuses invalid JSON) and the Codex TOML config (replaces only `[mcp_servers.agenthaven]`).
+- `src/server.js` acts as the agent named in `X-AgentHaven-Agent`, else as the human `you`. `/api/stream` is SSE (polls the workspace file mtime).
 - `desktop/main.js` Electron shell + electron-updater (GitHub Releases). `bin/agenthaven.js` CLI.
 - `docs/` = GitHub Pages site. All repo-facing text (README, site, UI, commits) is English.
 
