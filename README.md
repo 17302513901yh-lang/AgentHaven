@@ -87,7 +87,7 @@ Prefer an app? The [desktop app](#install) connects your agent apps by itself.
 
 ## Status
 
-Version 0.5 (alpha): a Claude Code plugin with hooks and slash commands, and a leaner MCP plugin;  a desktop app for Windows and macOS with automatic updates, multiple workspaces, a live dashboard, and one-click connection to Claude Desktop, Cursor, Windsurf, Gemini CLI and Codex. Installers are signed once the signing secrets are configured (see below).
+Version 0.6 (alpha): agent apps connect by themselves (Claude Desktop, Claude Code, Cursor, VS Code, Windsurf, Gemini CLI, Codex, LM Studio); a desktop app for Windows and macOS with updates from the dashboard, multiple workspaces and a live dashboard; a Claude Code plugin with hooks and slash commands. Installers are signed once the signing secrets are configured (see below).
 
 ## Install
 
@@ -150,7 +150,7 @@ Other routes: `GET /api/tasks`, `GET|PATCH|DELETE /api/tasks/:id`, `POST /api/ta
 
 ## The Claude Code plugin
 
-The plugin bundles the MCP server above with slash commands and three hooks. It needs Node.js 20 or later on your `PATH`.
+The plugin bundles the MCP server above with slash commands and three hooks. It runs on Node.js 20 or later; without Node.js it uses the runtime built into the [desktop app](#install): the hooks start through it, and the app connects Claude Code's MCP tools itself (and removes that entry again once Node.js is installed, so the tools never show twice).
 
 | Part | What it does |
 |---|---|

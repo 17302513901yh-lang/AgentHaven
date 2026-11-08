@@ -79,8 +79,9 @@ test('claude code: the plugin counts as connected, so tools are not added twice'
   fs.mkdirSync(path.dirname(c['claude-code'].plugins), { recursive: true });
   fs.writeFileSync(c['claude-code'].plugins, JSON.stringify({ plugins: { 'agenthaven@agenthaven': [{}] } }));
   fs.writeFileSync(c['claude-code'].file, JSON.stringify({ numStartups: 3 }));
-  assert.equal(state(connect.detect({ entryFor, ...opts }), 'claude-code'), 'plugin');
-  assert.deepEqual(connect.autoConnect({ entryFor, ...opts }).filter((x) => x.id === 'claude-code'), []);
+  const withNode = { ...opts, hasNode: true };
+  assert.equal(state(connect.detect({ entryFor, ...withNode }), 'claude-code'), 'plugin');
+  assert.deepEqual(connect.autoConnect({ entryFor, ...withNode }).filter((x) => x.id === 'claude-code'), []);
   fs.rmSync(c['claude-code'].plugins);
   connect.autoConnect({ entryFor, ...opts });
   const cfg = JSON.parse(fs.readFileSync(c['claude-code'].file, 'utf8'));
@@ -157,4 +158,68 @@ test('npx: the entry starts AgentHaven through npx, not from its cache folder', 
   assert.deepEqual(e.args.slice(0, 4), ['-y', 'github:laaielichter/AgentHaven', 'mcp', '--agent']);
   assert.equal(connect.nodeEntryFor('codex', 'default', { dir: 'C:\\Users\\u\\AppData\\Local\\npm-cache\\_npx\\abc\\src', platform: 'win32' }).command, 'cmd');
   assert.equal(connect.nodeEntryFor('codex').command, process.execPath);
+});
+
+test('claude code plugin without Node.js: the app connects Claude Code, and removes that again once Node.js is there', () => {
+  const { opts, entryFor, c } = fakeHome();
+  fs.mkdirSync(path.dirname(c['claude-code'].plugins), { recursive: true });
+  fs.writeFileSync(c['claude-code'].plugins, JSON.stringify({ plugins: { 'agenthaven@agenthaven': [{}] } }));
+  const noNode = { ...opts, hasNode: false };
+  const before = connect.detect({ entryFor, ...noNode }).find((x) => x.id === 'claude-code');
+  assert.equal(before.state, 'not-connected');
+  assert.match(before.reason, /needs Node\.js/);
+  assert.deepEqual(connect.autoConnect({ entryFor, ...noNode }).map((x) => [x.id, x.action]), [['claude-code', 'connected']]);
+  assert.equal(state(connect.detect({ entryFor, ...noNode }), 'claude-code'), 'connected');
+  const withNode = { ...opts, hasNode: true };
+  assert.deepEqual(connect.autoConnect({ entryFor, ...withNode }).map((x) => [x.id, x.action]), [['claude-code', 'deduplicated']]);
+  assert.equal(JSON.parse(fs.readFileSync(c['claude-code'].file, 'utf8')).mcpServers.agenthaven, undefined);
+  assert.equal(state(connect.detect({ entryFor, ...withNode }), 'claude-code'), 'plugin');
+});
+
+test('hasNode finds node in PATH and in the usual folders', () => {
+  const home = tmp('ah-node-');
+  const bin = path.join(home, 'bin');
+  fs.mkdirSync(bin);
+  const platform = process.platform;
+  const exe = platform === 'win32' ? 'node.exe' : 'node';
+  // Keep Windows' own install folders out of the lookup.
+  const env = (PATH) => ({ PATH, ProgramFiles: home, APPDATA: home, LOCALAPPDATA: home });
+  const found = (PATH) => connect.hasNode({ platform, env: env(PATH), home, shell: false });
+  const systemNode = platform !== 'win32' && ['/usr/bin/node', '/usr/local/bin/node', '/opt/homebrew/bin/node'].some((p) => fs.existsSync(p));
+  assert.equal(found(bin), systemNode);
+  fs.writeFileSync(path.join(bin, exe), '');
+  assert.equal(found(bin), true);
+  fs.rmSync(path.join(bin, exe));
+  fs.mkdirSync(path.join(home, '.nvm', 'versions', 'node', 'v22.0.0'), { recursive: true });
+  assert.equal(found(''), true);
+});
+
+test('plugin launcher: Node.js first, then the desktop app runtime; hooks fail open without either', { skip: process.platform === 'win32' }, () => {
+  const { execFileSync, spawnSync } = require('node:child_process');
+  const run = path.join(__dirname, '..', 'claude', 'run.sh');
+  const pkg = require('../package.json');
+  assert.equal(execFileSync('sh', [run, '--version'], { encoding: 'utf8' }).trim(), pkg.version);
+  // No node on PATH: use the runtime the desktop app wrote (here: this Node binary).
+  const dir = tmp('ah-rt-');
+  const file = path.join(dir, 'runtime');
+  fs.writeFileSync(file, `${process.execPath}\r\n`);
+  const env = { PATH: '/nonexistent', HOME: dir, AGENTHAVEN_RUNTIME_FILE: file };
+  const shPath = ['/bin/sh', '/usr/bin/sh'].find((p) => fs.existsSync(p));
+  const sedOk = ['/bin/sed', '/usr/bin/sed'].some((p) => fs.existsSync(p));
+  if (sedOk) {
+    // sed, tr and dirname are needed by the launcher; give it a PATH with only those.
+    const tools = tmp('ah-tools-');
+    for (const t of ['sed', 'tr', 'dirname']) {
+      const at = ['/bin', '/usr/bin'].map((d) => path.join(d, t)).find((p) => fs.existsSync(p));
+      if (at) fs.symlinkSync(at, path.join(tools, t));
+    }
+    env.PATH = tools;
+    assert.equal(execFileSync(shPath, [run, '--version'], { encoding: 'utf8', env }).trim(), pkg.version);
+    fs.rmSync(file);
+    const hook = spawnSync(shPath, [run, 'hook', 'session-start'], { encoding: 'utf8', env, input: '{}' });
+    assert.equal(hook.status, 0, 'hooks fail open');
+    const mcp = spawnSync(shPath, [run, 'mcp'], { encoding: 'utf8', env });
+    assert.equal(mcp.status, 1);
+    assert.match(mcp.stderr, /needs Node\.js 20 or later, or the AgentHaven desktop app/);
+  }
 });

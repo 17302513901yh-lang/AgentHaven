@@ -1,6 +1,8 @@
 'use strict';
 // AgentHaven desktop app (Windows + macOS) — Electron shell around the local
 // dashboard server. Agents connect through the bundled MCP plugin.
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
 const { spawnSync } = require('node:child_process');
 const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, shell } = require('electron');
@@ -46,6 +48,18 @@ function connectionSettings() {
     notice: !app.isPackaged ? 'Development build: agents are not connected automatically. Use Connect to try it.'
       : temporary ? 'Move AgentHaven to the Applications folder first, then open it again: agents are connected automatically from there.' : null,
   };
+}
+
+// The Claude Code plugin's launcher (claude/run.sh) uses this app's runtime when Node.js is
+// not installed. Written on every start, so it follows the app when it moves.
+function recordRuntime() {
+  const settings = connectionSettings();
+  if (!settings.auto) return;
+  try {
+    const dir = path.join(os.homedir(), '.agenthaven');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'runtime'), `${process.execPath}\n`);
+  } catch { /* the plugin then needs Node.js */ }
 }
 
 function connectAll() {
@@ -197,6 +211,7 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.whenReady().then(async () => {
+    recordRuntime();
     ({ url } = await start({ dataDir: defaultDataDir(), connections: connectionSettings() }));
     buildMenu();
     createWindow();

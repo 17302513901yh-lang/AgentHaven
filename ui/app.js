@@ -760,7 +760,7 @@ function renderConnections(c) {
       el('span', { className: 'ic', textContent: icon }),
       el('strong', { textContent: x.label }),
       el('div', { className: 'acts' }, acts),
-      el('span', { className: `st ${tone}`, textContent: off ? 'Disconnected by you' : x.state === 'broken-config' ? `${text}: fix it, then reconnect` : text, title: x.error || x.file }));
+      el('span', { className: `st ${tone}`, textContent: off ? 'Disconnected by you' : x.reason && x.state === 'not-connected' ? x.reason : x.state === 'broken-config' ? `${text}: fix it, then reconnect` : text, title: x.error || x.file }));
   }));
 
   // First-run card: the installed apps as chips.
@@ -768,7 +768,7 @@ function renderConnections(c) {
   $('#onboard-connect-all').hidden = !fix.length && live.length > 0;
 
   // After AgentHaven connected apps by itself: say so once.
-  const done = (c.lastAuto?.results || []).filter((r) => r.action !== 'error');
+  const done = (c.lastAuto?.results || []).filter((r) => ['connected', 'repaired'].includes(r.action));
   const show = done.length > 0 && seenAuto() !== c.lastAuto.at;
   $('#connect-banner').hidden = !show;
   if (show) {

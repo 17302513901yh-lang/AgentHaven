@@ -5,7 +5,12 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+## 0.6.0
+
+Seamless: agents connect by themselves, and the desktop app updates from the dashboard. [Full notes](docs/releases/v0.6.0.md)
+
 - **Agents connect by themselves**: the desktop app finds Claude Desktop, Claude Code, Cursor, VS Code (Copilot), Windsurf, Gemini CLI, Codex and LM Studio, connects them at start and every 10 minutes, repairs connections that point to an old or moved app, and says so once in a banner. A **Connect agents** panel in the dashboard shows each app with *Connect*, *Reconnect* and *Disconnect* and a switch for the automatic mode; `agenthaven connect` does the same from a terminal. Settings files with comments are read, files are replaced atomically with a backup, and Claude Code with the plugin is left alone.
+- **The Claude Code plugin works without Node.js** when the desktop app is installed: its hooks use the app's built-in runtime, and the app connects Claude Code's MCP tools itself until Node.js is installed.
 
 - **Updates in the dashboard** (desktop app): an update bar with download progress, release notes, *Restart and update*, *Later* and *Skip this version*, a version button in the header with an auto-check switch, and a one-time "updated to" note. Windows installs silently on restart; an unsigned macOS build downloads and opens the new `.dmg` instead of failing.
 
