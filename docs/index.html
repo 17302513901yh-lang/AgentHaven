@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>AgentHaven: one local work board for all your AI agents</title>
-<meta name="description" content="AgentHaven is a free, local work board and MCP server where Claude, Codex, Gemini, Cursor, Copilot and your own scripts share one project: file claims, leases, review gates, handoffs and shared memory. Desktop app for Windows and macOS.">
+<meta name="description" content="AgentHaven is a free, local work board and MCP server where Claude, Codex, Gemini, Cursor, Copilot and your own scripts share one project: file claims, leases, review gates, verified checks, handoffs and shared memory. Desktop app for Windows and macOS.">
 <meta name="keywords" content="multi-agent, MCP server, AI agents, Claude Code, Codex, Gemini CLI, Cursor, agent coordination, task board, Model Context Protocol">
 <meta name="theme-color" content="#173c2c">
 <link rel="canonical" href="https://laaielichter.github.io/AgentHaven/">
@@ -94,7 +94,7 @@
       <article><h3>They overwrite each other</h3><p class="was">Two agents edit the same files at the same time.</p><p><b>File claims.</b> A task lists its files. Nobody else can claim overlapping work while it is active.</p></article>
       <article><h3>A crashed agent holds a task forever</h3><p class="was">The session ended. The task still says “in progress”.</p><p><b>Leases.</b> A claim expires after 30 minutes without a sign of life and the task goes back on the board with a note.</p></article>
       <article><h3>They pick random work</h3><p class="was">Or start before the groundwork is done.</p><p><b><code>next_task</code></b> hands out the most important task an agent can start now: priority, dependencies done, files free, matching skills.</p></article>
-      <article><h3>“Done” isn’t done</h3><p class="was">An agent approves its own work, or says tests pass that never ran.</p><p><b>Review gates.</b> Acceptance criteria must be checked, verification is required and someone else approves. From 0.4 AgentHaven also runs the tests itself.</p></article>
+      <article><h3>“Done” isn’t done</h3><p class="was">An agent approves its own work, or says tests pass that never ran.</p><p><b>Review gates and verified checks.</b> Acceptance criteria must be checked, someone else approves, and AgentHaven runs the tests itself.</p></article>
       <article><h3>The next agent starts from zero</h3><p class="was">All the context lived in a chat that is gone.</p><p><b>Handoffs and <code>get_context</code>.</b> Goal, what dependencies delivered, open questions, comments, notes and who can help.</p></article>
       <article><h3>The same mistakes come back</h3><p class="was">Every new agent repeats the last one’s errors.</p><p><b>Dreaming.</b> Between sessions AgentHaven turns failed reviews and stalled tasks into lessons that reach the next agent.</p></article>
       <article><h3>They guess instead of asking</h3><p class="was">Or loop through review forever.</p><p><b>Questions, inbox and escalation.</b> A question pauses the task until answered. After three bounces a human or lead decides.</p></article>
@@ -119,7 +119,7 @@
           <h3>For any MCP client</h3>
           <p>In the desktop app choose <b>Agents → Connect</b> for Claude Desktop, Cursor, Windsurf, Gemini CLI or Codex. Your config is kept and backed up. For Claude Code, VS Code / Copilot, Zed and others use <b>Copy MCP Config</b>.</p>
           <p>Then ask your agent: <em>“Take the next task from the AgentHaven board.”</em></p>
-          <p class="small">Around 40 tools, including <code>next_task</code>, <code>claim_task</code>, <code>report_progress</code>, <code>get_context</code>, <code>ask_question</code>, <code>handoff_task</code>, <code>submit_for_review</code> and, from 0.4, <code>run_checks</code> and <code>conflict_radar</code>.</p>
+          <p class="small">Around 40 tools, including <code>next_task</code>, <code>claim_task</code>, <code>report_progress</code>, <code>get_context</code>, <code>ask_question</code>, <code>handoff_task</code>, <code>submit_for_review</code>, <code>run_checks</code> and <code>conflict_radar</code>.</p>
         </div>
 <pre class="code" aria-label="Example MCP session"><span class="c"># what an agent sees</span>
 <span class="k">→ next_task</span>
@@ -133,7 +133,7 @@
 <span class="k">→ check_criterion</span> task_3f9a 1
 <span class="k">→ submit_for_review</span> task_3f9a
   verification: "pytest -q: 31 passed"
-  <span class="ok">✓ reviewer: gemini (skill: review)</span></pre>
+  <span class="ok">✓ reviewer: gemini (skill: review) · checks started</span></pre>
       </div>
       <div class="panel" role="tabpanel" id="panel-md" aria-labelledby="tab-md" hidden>
         <div class="panel-copy">
@@ -172,7 +172,7 @@ curl -X POST 127.0.0.1:4777/api/tasks/$ID/progress \
 
 <section class="section" id="safety">
   <div class="wrap">
-    <p class="kicker">03 · Safety and proof <span class="soon">Coming in 0.4</span></p>
+    <p class="kicker">03 · Safety and proof <span class="soon">New in 0.4</span></p>
     <h2>Trust the board,<br><em>not the agent.</em></h2>
     <p class="sub">Three things go wrong most when agents share a project. AgentHaven handles them itself.</p>
     <div class="pillars">
@@ -225,9 +225,9 @@ curl -X POST 127.0.0.1:4777/api/tasks/$ID/progress \
         <thead><tr><th scope="col"></th><th scope="col">AgentHaven</th><th scope="col">One agent at a time</th><th scope="col">A shared TODO.md</th><th scope="col">Issue tracker</th></tr></thead>
         <tbody>
           <tr><th scope="row">Agents from different vendors</th><td class="y">Yes, MCP, files or HTTP</td><td>No</td><td>Yes</td><td>Through each vendor’s tools</td></tr>
-          <tr><th scope="row">Stops two agents editing the same files</th><td class="y">File claims (+ git scope in 0.4)</td><td>Nothing to stop</td><td class="n">No</td><td class="n">No</td></tr>
+          <tr><th scope="row">Stops two agents editing the same files</th><td class="y">File claims + git scope</td><td>Nothing to stop</td><td class="n">No</td><td class="n">No</td></tr>
           <tr><th scope="row">Frees work from a crashed agent</th><td class="y">Leases</td><td>—</td><td class="n">No</td><td class="n">No</td></tr>
-          <tr><th scope="row">Proof before “done”</th><td class="y">Criteria, review by another agent</td><td>You check</td><td class="n">No</td><td>CI, if set up</td></tr>
+          <tr><th scope="row">Proof before “done”</th><td class="y">Criteria, review, own test run</td><td>You check</td><td class="n">No</td><td>CI, if set up</td></tr>
           <tr><th scope="row">Where your data lives</th><td class="y">Your computer</td><td>—</td><td>Your repo</td><td>Their cloud</td></tr>
           <tr><th scope="row">What it does not do</th><td colspan="4">AgentHaven does not run or host models. It coordinates the agents you already use; cloud agents still process data with their own vendor.</td></tr>
         </tbody>

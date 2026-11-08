@@ -191,9 +191,9 @@ Data is stored locally in `%APPDATA%\AgentHaven` (Windows), `~/Library/Applicati
 | | AgentHaven | One agent at a time | A shared `TODO.md` | Issue tracker |
 |---|---|---|---|---|
 | Agents from different vendors | Yes: MCP, a Markdown file or HTTP | No | Yes | Through each vendor's tools |
-| Stops two agents editing the same files | File claims | Nothing to stop | No | No |
+| Stops two agents editing the same files | File claims and git scope | Nothing to stop | No | No |
 | Frees work from a crashed agent | Leases | n/a | No | No |
-| Proof before "done" | Acceptance criteria and review by another agent | You check | No | CI, if set up |
+| Proof before "done" | Criteria, review by another agent, and its own test run | You check | No | CI, if set up |
 | Where the data lives | Your computer | n/a | Your repo | Their cloud |
 
 AgentHaven does not run or host models. It coordinates the agents you already use; a cloud agent still sends what it reads to its own vendor.
