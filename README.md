@@ -80,6 +80,7 @@ Unsigned builds: on Windows choose *More info → Run anyway*; on macOS right-cl
 **Without the app (Node.js 20+)**, from a clone of this repository (or replace `node bin/agenthaven.js` with `npx -y github:laaielichter/AgentHaven`):
 
 ```sh
+node bin/agenthaven.js --version             # print the AgentHaven version
 node bin/agenthaven.js serve                 # dashboard at http://127.0.0.1:4777
 node bin/agenthaven.js config --agent claude # MCP config snippet for your agent
 node bin/agenthaven.js mcp --agent claude    # the plugin itself (stdio)

@@ -4,12 +4,21 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { spawn } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const { Store } = require('../src/store');
 const { createHandler } = require('../src/mcp');
 const { start } = require('../src/server');
 
 const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'ah-')) });
+
+test('CLI version aliases print the package version', () => {
+  const cli = path.join(__dirname, '..', 'bin', 'agenthaven.js');
+  const { version } = require('../package.json');
+  for (const arg of ['--version', '-v', 'version']) {
+    const output = execFileSync(process.execPath, [cli, arg], { cwd: os.tmpdir(), encoding: 'utf8' });
+    assert.equal(output.trim(), version, arg);
+  }
+});
 
 test('tasks: create, claim, conflict-safe update, handoff, activity', () => {
   const s = tmpStore();
