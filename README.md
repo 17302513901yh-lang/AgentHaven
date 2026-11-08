@@ -120,7 +120,9 @@ curl -X POST "http://127.0.0.1:4777/api/tasks/<id>/progress" -H "X-AgentHaven-Ag
      -d '{"progress": 40, "metrics": {"loss": 0.41, "accuracy": 0.87}, "usage": {"costUsd": 0.12}}'
 ```
 
-[`examples/report_progress.py`](examples/report_progress.py) is a complete training-loop reporter that needs only the Python standard library. Other routes: `GET /api/tasks`, `GET|PATCH|DELETE /api/tasks/:id`, `POST /api/tasks/:id/{claim,handoff,criteria,submit,review,comments}`, `GET|POST /api/agents`, `POST /api/heartbeat`, `GET /api/events?since=`, `GET /api/stats`, `GET|POST /api/dreams`, `GET /api/dreams/digest`, `POST /api/dreams/submit`, `POST /api/dreams/proposals/:id/{apply,dismiss}`, `PATCH /api/dreams/settings` and the live stream `GET /api/stream`.
+The training-loop reporter is available as [`examples/report_progress.py`](examples/report_progress.py) (Python standard library) and [`examples/report_progress.mjs`](examples/report_progress.mjs) (Node.js 20+, no dependencies). Start AgentHaven and create an available task, then run `node examples/report_progress.mjs` to see a simulated run. Both examples accept `AGENTHAVEN_URL`, `AGENTHAVEN_AGENT` and `AGENTHAVEN_WORKSPACE`.
+
+Other routes: `GET /api/tasks`, `GET|PATCH|DELETE /api/tasks/:id`, `POST /api/tasks/:id/{claim,handoff,criteria,submit,review,comments}`, `GET|POST /api/agents`, `POST /api/heartbeat`, `GET /api/events?since=`, `GET /api/stats`, `GET|POST /api/dreams`, `GET /api/dreams/digest`, `POST /api/dreams/submit`, `POST /api/dreams/proposals/:id/{apply,dismiss}`, `PATCH /api/dreams/settings` and the live stream `GET /api/stream`.
 
 ## Working together across vendors
 
