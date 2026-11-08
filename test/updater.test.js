@@ -149,3 +149,8 @@ test('release notes are shown as text, never as markup', () => {
   assert.equal(notesToText([{ note: '<b>x</b>' }, { note: 'y' }]), 'x\n\ny');
   assert.equal(notesToText(null), '');
 });
+
+test('nested or broken tags cannot survive the clean-up', () => {
+  const out = notesToText('<scr<script>ipt>alert(1)</scr</script>ipt> <img src=x onerror=1');
+  assert.ok(!/[<>]/.test(out), out);
+});

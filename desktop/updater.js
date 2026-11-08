@@ -21,10 +21,13 @@ const RELEASES = 'https://github.com/laaielichter/AgentHaven/releases';
 function notesToText(notes) {
   if (Array.isArray(notes)) notes = notes.map((n) => n.note || '').join('\n\n');
   if (!notes) return '';
-  return String(notes)
+  let text = String(notes)
     .replace(/<\s*(br|\/p|\/li|\/h[1-6]|\/div)\s*\/?>/gi, '\n')
-    .replace(/<\s*li[^>]*>/gi, '• ')
-    .replace(/<[^>]*>/g, '')
+    .replace(/<\s*li[^>]*>/gi, '• ');
+  // Strip tags until none are left (a removed tag can join the halves of another), then drop
+  // any stray angle bracket. The dashboard also shows this with textContent only.
+  for (let prev = ''; prev !== text;) { prev = text; text = text.replace(/<[^>]*>/g, ''); }
+  return text.replace(/[<>]/g, '')
     .replace(/&nbsp;/g, ' ').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&')
     .replace(/\n{3,}/g, '\n\n')
     .trim()
