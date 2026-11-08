@@ -27,7 +27,7 @@
 - Plugin inside the packaged app runs through the app exe with `ELECTRON_RUN_AS_NODE=1`, hence `asar: false`.
 - Updates require `version` (optimistic concurrency) → HTTP 409 / MCP `isError`.
 - Signing: separate `WIN_*` / `MAC_*` secrets (one CSC_LINK can't serve both). macOS auto-update needs the `zip` target and a signed+notarized build.
-- Auto-update only sees *published* releases; CI creates drafts.
+- Auto-update only sees *published* releases; CI creates drafts. `.github/workflows/publish-release.yml` (workflow_dispatch, input `tag`, default the package.json version) publishes one after checking for `latest.yml`, `latest-mac.yml`, `.exe` and `.dmg`, and deletes older unpublished drafts (tags are kept).
 
 ## Conventions
 - Every README, website and release note ends with a short, polite request to star the repository (the dashboard has a ★ Star link and asks once, after five done tasks; never in agent-facing text such as hooks, prompts or MCP instructions), and links the `good first issue` and `help wanted` labels for contributors. Never offer anything in exchange for a star, and never ask for stars in issues, PR comments or other people's threads.
