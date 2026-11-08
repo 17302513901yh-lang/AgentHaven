@@ -45,7 +45,7 @@ switch (cmd) {
     break;
   case 'serve':
     require('../src/server').start({ port: Number(flag('port', 4777)), store: store(), onError: (err, ws) => console.error(`[workboard ${ws}] ${err.message}`) })
-      .then(({ url }) => console.log(`AgentHaven dashboard: ${url}  (data: ${defaultDataDir()})`))
+      .then(({ url }) => console.log(`AgentHaven dashboard: ${url}  (data: ${defaultDataDir()})\nEnjoying AgentHaven? A star on GitHub helps other people find it: https://github.com/laaielichter/AgentHaven`))
       .catch((err) => fail(err.message));
     break;
   case 'config': {

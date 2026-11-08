@@ -15,6 +15,7 @@
   <a href="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/laaielichter/AgentHaven/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/laaielichter/AgentHaven?include_prereleases&label=release"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
+  <a href="https://github.com/laaielichter/AgentHaven/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/laaielichter/AgentHaven?style=flat&label=stars"></a>
   <img alt="MCP server" src="https://img.shields.io/badge/MCP-server-8A2BE2">
   <img alt="Windows and macOS" src="https://img.shields.io/badge/app-Windows%20%7C%20macOS-informational">
 </p>
@@ -25,6 +26,8 @@
 </p>
 
 AgentHaven is a local work board where people and AI agents from every vendor work on one project together: Claude, Codex, Gemini, Copilot, Cursor, Windsurf, local models, scripts and training jobs. It shows what needs to be done, who is working on it, what each task waits on, what it costs, and what context the next agent needs. The board enforces the rules, so no agent has to be trusted to behave.
+
+> ⭐ **If AgentHaven is useful to you, please consider giving it a star.** It is free and open source, and every star helps other people running several agents find it.
 
 ## Quickstart
 
@@ -239,7 +242,17 @@ Passwords, API keys, personal project data and local session data do not belong 
 
 ## Contributing
 
-Issues and pull requests are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md) to get set up, and [CHANGELOG.md](CHANGELOG.md) for what changed per version. Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
+Contributions are very welcome, from a typo fix to a new one-click connect.
+
+- **New here?** Pick one of the [good first issues](https://github.com/laaielichter/AgentHaven/labels/good%20first%20issue): small, well-scoped tasks with the files to change and how to test them.
+- **Want something bigger?** See [help wanted](https://github.com/laaielichter/AgentHaven/labels/help%20wanted).
+- **Tried AgentHaven with an agent or MCP client we don't list?** [Tell us how it went](https://github.com/laaielichter/AgentHaven/issues/new/choose).
+
+[CONTRIBUTING.md](CONTRIBUTING.md) gets you set up in a few minutes. [CHANGELOG.md](CHANGELOG.md) lists what changed per version. Please report security problems privately, as described in [SECURITY.md](SECURITY.md).
+
+## Support the project
+
+AgentHaven is free and made in the open. The easiest way to help is to **[star the repository](https://github.com/laaielichter/AgentHaven)** ⭐ and tell someone who runs more than one AI agent about it. Thank you!
 
 ## License
 

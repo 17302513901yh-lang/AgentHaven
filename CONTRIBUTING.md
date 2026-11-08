@@ -4,8 +4,9 @@ Thanks for helping. Small fixes and big ideas are both welcome.
 
 ## Ways to help
 
+- Star the repository ⭐ so more people find it.
 - Report a bug or suggest a feature with the issue forms.
-- Pick an issue labeled `good first issue`.
+- Pick an issue labeled [`good first issue`](https://github.com/laaielichter/AgentHaven/labels/good%20first%20issue) or [`help wanted`](https://github.com/laaielichter/AgentHaven/labels/help%20wanted). Comment on it first so nobody else starts the same work.
 - Try AgentHaven with an agent or MCP client we have not tested, and tell us what happened.
 - Improve the docs, the website (`docs/`) or add an example to `examples/`.
 
@@ -34,6 +35,10 @@ through it, so a rule changed there applies everywhere.
 4. Run `npm run lint && npm test`, and say in the pull request what you changed and how you checked it.
 
 All repo-facing text (code, docs, UI, commits) is in English.
+
+## Credit
+
+Your commits keep your name, and every contributor is thanked by name in the [CHANGELOG](CHANGELOG.md) and the release notes.
 
 ## Be kind
 
