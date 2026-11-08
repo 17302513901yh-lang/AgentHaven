@@ -145,6 +145,7 @@ async function render() {
     : [el('li', { className: 'empty', textContent: q ? 'No matching notes.' : 'No notes yet.' })]));
   $('#activity').replaceChildren(...(activity.length ? activity.map((e) => el('li', {}, el('strong', { textContent: e.actor }), ` ${e.action.replace(/^task\./, '').replace(/[._]/g, ' ')} `, e.ref?.startsWith('task_') ? el('code', { textContent: tasks.find((x) => x.id === e.ref)?.title || e.ref }) : null, ' ', el('span', { className: 'm', textContent: ago(e.at) })))
     : [el('li', { className: 'empty', textContent: 'Nothing yet.' })]));
+  await renderDreams();
   statusEl.textContent = live ? 'Live' : 'Polling';
   statusEl.classList.remove('err');
 }
@@ -224,6 +225,10 @@ function fillDialog(task) {
   banner.textContent = task.blockedReason ? task.blockedReason
     : waiting.length ? `Starts after: ${waiting.map((w) => `${w.title} (${LABELS[w.status]})`).join(', ')}`
       : task.status === 'review' ? `${task.assignee} asks for review. Approve, or request changes with a comment.` : '';
+
+  const lessons = task.lessons || [];
+  $('#dlg-lessons').hidden = !lessons.length;
+  $('#dlg-lessons').replaceChildren(el('strong', { textContent: `Lessons learned (${lessons.length})` }), el('ul', {}, lessons.map((l) => el('li', { title: l.body }, el('b', { textContent: l.title }), ` — ${l.body.split('\n')[0]}`))));
 
   draftCriteria = (task.criteria || []).map((c) => ({ ...c }));
   renderCriteria();
@@ -366,6 +371,41 @@ document.addEventListener('keydown', (e) => {
   if (document.querySelector('dialog[open]') || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return;
   if (e.key === 'n') { e.preventDefault(); $('#task-title').focus(); }
   if (e.key === '/') { e.preventDefault(); $('#filter').focus(); }
+});
+
+// ---- dreams -------------------------------------------------------------------------
+
+const KIND_LABEL = { lesson: 'Lesson', task: 'Follow-up task', 'merge-notes': 'Merge notes', 'retire-note': 'Retire note', 'agent-tip': 'Agent tip' };
+async function renderDreams() {
+  const r = await api('/api/dreams?limit=10');
+  const open = r.dreams.flatMap((d) => d.proposals.filter((p) => p.status === 'proposed').map((p) => ({ ...p, by: d.by })));
+  const last = r.dreams[0];
+  $('#dream-state').textContent = last ? `Last dream ${ago(last.at)} by ${last.by}: ${last.summary}` : 'No dreams yet. The dreamer looks back at reviews sent back, expired claims, budgets and notes, and proposes lessons.';
+  $('#proposals').replaceChildren(...(open.length ? open.map((p) => el('li', { className: 'proposal' },
+    el('span', { className: 'kind', textContent: `${KIND_LABEL[p.kind] || p.kind}${p.agent ? ` · ${p.agent}` : ''} · by ${p.by}` }),
+    el('strong', { textContent: p.title }),
+    el('span', { className: 'body', textContent: p.body }),
+    p.evidence?.length ? el('span', { className: 'm', textContent: `Evidence: ${p.evidence.map((id) => tasks.find((t) => t.id === id)?.title || id).join(', ')}` }) : null,
+    el('span', { className: 'row' },
+      el('button', { type: 'button', className: 'ok', textContent: 'Apply', onclick: () => act(() => api(`/api/dreams/proposals/${p.id}/apply`, { method: 'POST', body: {} })) }),
+      el('button', { type: 'button', className: 'ghost', textContent: 'Dismiss', onclick: () => act(() => api(`/api/dreams/proposals/${p.id}/dismiss`, { method: 'POST', body: {} })) }))))
+    : [el('li', { className: 'empty', textContent: 'No open proposals.' })]));
+  if (document.activeElement !== $('#dream-every')) $('#dream-every').value = r.settings.everyHours;
+  $('#dream-auto').checked = r.settings.autoApply;
+  $('#dream-agent').checked = r.settings.agentTask;
+}
+const saveDreamSettings = () => act(() => api('/api/dreams/settings', { method: 'PATCH', body: { autoApply: $('#dream-auto').checked, agentTask: $('#dream-agent').checked, everyHours: Number($('#dream-every').value || 0) } }));
+$('#dream-auto').addEventListener('change', saveDreamSettings);
+$('#dream-agent').addEventListener('change', saveDreamSettings);
+$('#dream-every').addEventListener('change', saveDreamSettings);
+$('#dream-now').addEventListener('click', () => act(() => api('/api/dreams', { method: 'POST', body: {} })));
+$('#dream-prompt').addEventListener('click', async () => {
+  try {
+    const { prompt } = await api('/api/dreams/prompt');
+    await navigator.clipboard.writeText(prompt);
+    $('#dream-prompt').textContent = 'Copied';
+    setTimeout(() => { $('#dream-prompt').textContent = 'Copy instructions for a Claude dreaming agent'; }, 1500);
+  } catch (err) { showError(err); }
 });
 
 // ---- workspaces and file sharing --------------------------------------------------

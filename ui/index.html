@@ -56,6 +56,20 @@
       <h2 id="agents-h">Agents</h2>
       <ul id="agents" class="list agents"></ul>
     </section>
+    <section aria-labelledby="dreams-h" class="dreams">
+      <div class="row"><h2 id="dreams-h" class="grow">Dreams</h2><button type="button" id="dream-now" class="ghost" title="Look back at past mistakes now">Dream now</button></div>
+      <p class="m" id="dream-state"></p>
+      <ul id="proposals" class="list"></ul>
+      <details>
+        <summary>Dream settings</summary>
+        <div class="stack">
+          <label class="check"><input type="checkbox" id="dream-auto"> Apply proposals without review</label>
+          <label class="check"><input type="checkbox" id="dream-agent"> Also put a "Dream" task on the board for an LLM agent with the skill <code>dreaming</code></label>
+          <label class="row">Dream every <input type="number" id="dream-every" min="0" max="720" step="1" class="hours"> hours (0 = only by hand)</label>
+          <button type="button" id="dream-prompt" class="ghost">Copy instructions for a Claude dreaming agent</button>
+        </div>
+      </details>
+    </section>
     <section aria-labelledby="claims-h">
       <h2 id="claims-h">Files in use</h2>
       <ul id="claims" class="list small"></ul>
@@ -92,6 +106,7 @@
       <button type="button" class="ghost icon" id="dlg-x" aria-label="Close">✕</button>
     </div>
     <div id="dlg-banner" class="banner" hidden></div>
+    <div id="dlg-lessons" class="lessons" hidden></div>
     <div class="tabs" role="tablist">
       <button type="button" role="tab" data-tab="details" aria-selected="true">Details</button>
       <button type="button" role="tab" data-tab="criteria">Criteria <span id="tab-criteria-n"></span></button>

@@ -299,3 +299,103 @@ test('workboard: backslashes and pipes in text cannot break the tables', () => {
   assert.ok(row.includes('C:\\\\path\\\\ \\| weird \\\\\\| title'), row);
   assert.equal(row.split(/(?<!\\)\|/).length - 2, 7, 'still seven columns');
 });
+
+test('dreaming: past mistakes become lessons that reach the next agent', async () => {
+  const dreams = require('../src/dream');
+  const s = tmpStore({ leaseMs: 30 });
+  // Two reviews in src/api sent back for the same reason.
+  for (const n of [1, 2]) {
+    const t = s.createTask({ title: `Endpoint ${n}`, files: [`src/api/e${n}.js`], review: true, actor: 'roel' });
+    s.claimTask(t.id, { actor: 'codex' });
+    s.submitForReview(t.id, { actor: 'codex', summary: 'done' });
+    s.reviewTask(t.id, { actor: 'claude', approve: false, comment: 'missing input validation tests' });
+  }
+  // A task whose claims keep expiring.
+  const big = s.createTask({ title: 'Rewrite the renderer', actor: 'roel' });
+  s.claimTask(big.id, { actor: 'gemini' });
+  await sleep(50);
+  s.claimTask(big.id, { actor: 'gemini' });
+  await sleep(50);
+  s.listTasks();
+  // Two notes that say the same thing.
+  s.addNote({ title: 'Paths', body: 'Always store paths with forward slashes in the store', actor: 'a' });
+  s.addNote({ title: 'Paths again', body: 'Always store paths with forward slashes in the store please', actor: 'b' });
+
+  const d = dreams.dream(s);
+  const kinds = [...new Set(d.proposals.map((p) => p.kind))].sort();
+  assert.deepEqual(kinds, ['agent-tip', 'lesson', 'merge-notes', 'task']);
+  // With a 30 ms lease, both gemini (renderer) and codex (sent-back work) went quiet twice.
+  assert.deepEqual(d.proposals.filter((p) => p.kind === 'agent-tip').map((p) => p.agent).sort(), ['codex', 'gemini']);
+  const lesson = d.proposals.find((p) => p.kind === 'lesson');
+  assert.match(lesson.title, /src\/api was sent back 2 times/);
+  assert.match(lesson.body, /missing input validation tests/);
+  assert.deepEqual(lesson.scope.files, ['src/api']);
+  assert.ok(d.proposals.every((p) => p.status === 'proposed'), 'nothing changes without review');
+
+  assert.throws(() => dreams.applyProposal(s, lesson.id, { actor: 'codex' }), /only a human/);
+  dreams.applyProposal(s, lesson.id, { actor: 'you' });
+  const split = d.proposals.find((p) => p.kind === 'task');
+  assert.match(dreams.applyProposal(s, split.id, { actor: 'you' }).ref, /^task_/);
+  dreams.applyProposal(s, d.proposals.find((p) => p.kind === 'merge-notes').id, { actor: 'you' });
+  assert.equal(s.listNotes().filter((n) => n.title.startsWith('Paths')).length, 1);
+  for (const tip of d.proposals.filter((p) => p.kind === 'agent-tip')) dreams.dismissProposal(s, tip.id, { actor: 'you', reason: 'known' });
+
+  // The next agent working in src/api gets the lesson.
+  const next = s.createTask({ title: 'Endpoint 3', files: ['src/api/e3.js'], actor: 'roel' });
+  assert.equal(dreams.lessonsFor(s, s.getTask(next.id))[0].title, lesson.title);
+  assert.deepEqual(dreams.lessonsFor(s, s.createTask({ title: 'Unrelated docs', files: ['docs/x.md'], actor: 'roel' })), []);
+  assert.match(wb.renderBoard(s), /## Lessons learned[\s\S]*src\/api was sent back/);
+
+  // A second dream sees nothing new and does not repeat itself.
+  assert.equal(dreams.dream(s).proposals.length, 0);
+});
+
+test('dreaming: an LLM dreamer (e.g. Claude) works through MCP; auto-apply skips review', () => {
+  const dreams = require('../src/dream');
+  const s = tmpStore();
+  const h = createHandler({ store: s, agent: 'claude-dreamer' });
+  const call = (name, args) => {
+    const res = h({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name, arguments: args } }).result;
+    return res.isError ? { error: res.content[0].text } : JSON.parse(res.content[0].text);
+  };
+  s.createTask({ title: 'Seed', actor: 'roel' });
+  const dg = call('dream_digest', {});
+  assert.ok(dg.until > 0 && Array.isArray(dg.sentBack) && dg.guide);
+  assert.match(call('submit_dream', { summary: 'x', proposals: [{ kind: 'retire-note', title: 'r', body: 'b', note: 'note_missing' }] }).error, /not found/);
+  const d = call('submit_dream', { summary: 'Handoffs leave out how to run the tests.', proposals: [
+    { kind: 'lesson', title: 'Say how to run the tests in every handoff', body: 'Write the exact command.', scope: { skills: ['python'] }, evidence: [] }] });
+  assert.equal(d.by, 'claude-dreamer');
+  assert.equal(d.proposals[0].status, 'proposed');
+  assert.equal(call('dream_digest', {}).openProposals.length, 1);
+  dreams.setDreamSettings(s, { autoApply: true });
+  const auto = call('submit_dream', { summary: 'y', proposals: [{ kind: 'lesson', title: 'Pin tool versions in CI', body: 'Unpinned versions broke CI twice.' }] });
+  assert.equal(auto.proposals[0].status, 'applied');
+  const t = call('create_task', { title: 'Add a parser', skills: ['python'] });
+  const got = call('get_task', { id: t.id });
+  assert.deepEqual(got.lessons.map((l) => l.title), []);
+  dreams.applyProposal(s, d.proposals[0].id, { actor: 'you' });
+  assert.equal(call('get_task', { id: t.id }).lessons[0].title, 'Say how to run the tests in every handoff');
+  assert.match(dreams.CLAUDE_DREAMER, /submit_dream/);
+});
+
+test('HTTP: dream now, review proposals, settings', async () => {
+  const s = tmpStore();
+  const { server, url } = await start({ store: s });
+  try {
+    const json = { 'Content-Type': 'application/json' };
+    s.addNote({ title: 'Tabs', body: 'Indent with two spaces everywhere in this repository', actor: 'a' });
+    s.addNote({ title: 'Indent', body: 'Indent with two spaces everywhere in this repository!', actor: 'b' });
+    const d = await (await fetch(`${url}api/dreams`, { method: 'POST', headers: json, body: '{}' })).json();
+    assert.equal(d.proposals[0].kind, 'merge-notes');
+    const asAgent = await fetch(`${url}api/dreams/proposals/${d.proposals[0].id}/apply`, { method: 'POST', headers: { ...json, 'X-AgentHaven-Agent': 'codex' }, body: '{}' });
+    assert.equal(asAgent.status, 409);
+    assert.equal((await fetch(`${url}api/dreams/proposals/${d.proposals[0].id}/apply`, { method: 'POST', headers: json, body: '{}' })).status, 201);
+    const set = await (await fetch(`${url}api/dreams/settings`, { method: 'PATCH', headers: json, body: JSON.stringify({ everyHours: 12, autoApply: true }) })).json();
+    assert.deepEqual(set, { autoApply: true, everyHours: 12, agentTask: false });
+    const list = await (await fetch(`${url}api/dreams`)).json();
+    assert.equal(list.dreams[0].proposals[0].status, 'applied');
+    assert.match((await (await fetch(`${url}api/dreams/prompt`)).json()).prompt, /dreaming agent/);
+  } finally {
+    server.close();
+  }
+});

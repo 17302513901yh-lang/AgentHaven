@@ -10,23 +10,29 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Store, defaultDataDir } = require('./store');
 const workboard = require('./workboard');
+const dreams = require('./dream');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 const AGENT_RE = /^[\w.@-]{1,100}$/;
 const STATUS = { CONFLICT: 409, INVALID: 400, NOT_FOUND: 404 };
 
-function createServer({ store, dataDir, human = 'you', onError = () => {} } = {}) {
+function createServer({ store, dataDir, human = 'you', onError = () => {}, dream = true } = {}) {
   // One Store per workspace, selected with ?workspace=name (default: "default").
   const stores = new Map();
   const watchers = new Map();
-  if (store) { dataDir ||= store.dataDir; stores.set(store.workspace, store); }
-  dataDir ||= defaultDataDir();
+  dataDir ||= store ? store.dataDir : defaultDataDir();
+  const dreamers = new Map();
   const storeFor = (name) => {
     if (!stores.has(name)) stores.set(name, new Store({ dataDir, workspace: name }));
-    return stores.get(name);
+    const s = stores.get(name);
+    // Every open workspace dreams on its own schedule (settings.dream.everyHours).
+    if (dream && !dreamers.has(name)) dreamers.set(name, dreams.schedule(s, { onError: (err) => onError(err, name) }));
+    return s;
   };
+  if (store) { stores.set(store.workspace, store); storeFor(store.workspace); }
   const pick = (q) => storeFor(q.get('workspace') || (store ? store.workspace : 'default'));
+  const lessons = (s, t, actor) => ({ ...t, lessons: dreams.lessonsFor(s, t, { agent: actor }) });
 
   const link = (s, dir) => {
     watchers.get(s.workspace)?.stop();
@@ -46,11 +52,19 @@ function createServer({ store, dataDir, human = 'you', onError = () => {} } = {}
     ['GET', /^\/api\/tasks$/, (q, b, a) => a.s.listTasks({ status: q.get('status') || undefined, assignee: q.get('assignee') || undefined })],
     ['POST', /^\/api\/tasks$/, (q, b, a) => a.s.createTask({ ...b, actor: a.actor })],
     ['GET', /^\/api\/tasks\/next$/, (q, b, a) => a.s.nextTask({ actor: a.actor, claim: false })],
-    ['POST', /^\/api\/tasks\/next$/, (q, b, a) => a.s.nextTask({ actor: a.actor, claim: b.claim !== false, skills: b.skills })],
-    ['GET', /^\/api\/tasks\/([\w-]+)$/, (q, b, a, id) => a.s.getTask(id)],
+    ['POST', /^\/api\/tasks\/next$/, (q, b, a) => { const r = a.s.nextTask({ actor: a.actor, claim: b.claim !== false, skills: b.skills }); if (r.task) r.task = lessons(a.s, r.task, a.actor); return r; }],
+    ['GET', /^\/api\/tasks\/([\w-]+)$/, (q, b, a, id) => lessons(a.s, a.s.getTask(id), a.actor)],
     ['PATCH', /^\/api\/tasks\/([\w-]+)$/, (q, b, a, id) => a.s.updateTask(id, { ...b, actor: a.actor })],
     ['DELETE', /^\/api\/tasks\/([\w-]+)$/, (q, b, a, id) => a.s.deleteTask(id, { version: q.has('version') ? Number(q.get('version')) : undefined, actor: a.actor })],
-    ['POST', /^\/api\/tasks\/([\w-]+)\/claim$/, (q, b, a, id) => a.s.claimTask(id, { actor: a.actor })],
+    ['POST', /^\/api\/tasks\/([\w-]+)\/claim$/, (q, b, a, id) => lessons(a.s, a.s.claimTask(id, { actor: a.actor }), a.actor)],
+    ['GET', /^\/api\/dreams$/, (q, b, a) => ({ settings: dreams.settingsOf(a.s), lastDreamAt: a.s.getSettings().lastDreamAt || null, dreams: dreams.listDreams(a.s, { limit: Number(q.get('limit')) || 10 }) })],
+    ['POST', /^\/api\/dreams$/, (q, b, a) => dreams.dream(a.s)],
+    ['GET', /^\/api\/dreams\/digest$/, (q, b, a) => dreams.digest(a.s, { since: q.has('since') ? Number(q.get('since')) : undefined })],
+    ['POST', /^\/api\/dreams\/submit$/, (q, b, a) => dreams.recordDream(a.s, { actor: a.actor, summary: b.summary, proposals: b.proposals })],
+    ['PATCH', /^\/api\/dreams\/settings$/, (q, b, a) => dreams.setDreamSettings(a.s, b, a.actor)],
+    ['GET', /^\/api\/dreams\/prompt$/, () => ({ prompt: dreams.CLAUDE_DREAMER })],
+    ['POST', /^\/api\/dreams\/proposals\/([\w-]+)\/apply$/, (q, b, a, id) => dreams.applyProposal(a.s, id, { actor: a.actor })],
+    ['POST', /^\/api\/dreams\/proposals\/([\w-]+)\/dismiss$/, (q, b, a, id) => dreams.dismissProposal(a.s, id, { actor: a.actor, reason: b.reason })],
     ['POST', /^\/api\/tasks\/([\w-]+)\/handoff$/, (q, b, a, id) => a.s.handoff(id, { ...b, actor: a.actor })],
     ['POST', /^\/api\/tasks\/([\w-]+)\/progress$/, (q, b, a, id) => a.s.reportProgress(id, { ...b, actor: a.actor })],
     ['POST', /^\/api\/tasks\/([\w-]+)\/criteria$/, (q, b, a, id) => a.s.setCriterion(id, { ...b, criterion: String(b.criterion), actor: a.actor })],
@@ -145,7 +159,7 @@ function createServer({ store, dataDir, human = 'you', onError = () => {} } = {}
     if (!full.startsWith(UI_DIR + path.sep) || req.method !== 'GET') return send(404, { error: 'not found' });
     fs.readFile(full, (err, data) => (err ? send(404, { error: 'not found' }) : send(200, data, MIME[path.extname(full)] || 'application/octet-stream')));
   });
-  server.on('close', () => { for (const w of watchers.values()) w.stop(); watchers.clear(); });
+  server.on('close', () => { for (const w of [...watchers.values(), ...dreamers.values()]) w.stop(); watchers.clear(); dreamers.clear(); });
   return server;
 }
 

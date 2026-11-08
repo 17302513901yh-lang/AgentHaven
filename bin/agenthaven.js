@@ -25,6 +25,8 @@ Usage:
   agenthaven sync         [--watch] [--workspace name]       apply WORKBOARD.md Inbox commands and rewrite the board
   agenthaven instructions [--workspace name]                 text to paste into AGENTS.md, CLAUDE.md, GEMINI.md, ...
   agenthaven board        [--workspace name]                 print the board as Markdown
+  agenthaven dream        [--workspace name]                 look back at past mistakes now and propose lessons
+  agenthaven dream --prompt                                  print the instructions for a Claude (or other LLM) dreaming agent
 
 Scripts and training jobs can use the HTTP API of "serve" with the header
 X-AgentHaven-Agent: <name> (see examples/report_progress.py).
@@ -87,6 +89,15 @@ switch (cmd) {
   case 'board':
     console.log(require('../src/workboard').renderBoard(store()));
     break;
+  case 'dream': {
+    const dreams = require('../src/dream');
+    if (has('prompt')) { console.log(dreams.CLAUDE_DREAMER); break; }
+    const d = dreams.dream(store());
+    console.log(d.summary);
+    for (const p of d.proposals) console.log(`- [${p.status}] ${p.kind}: ${p.title}`);
+    if (d.proposals.some((p) => p.status === 'proposed')) console.log('\nReview them in the dashboard (Dreams), or turn on auto-apply there.');
+    break;
+  }
   case 'help': case '--help': case '-h':
     console.log(HELP);
     break;

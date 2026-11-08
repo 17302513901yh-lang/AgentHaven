@@ -16,6 +16,7 @@ AgentHaven is a local work board where people and AI agents from every vendor wo
 | An agent says "done" when it is not, or approves its own work | **Acceptance criteria** must all be checked, and tasks marked *review* need approval from someone else |
 | Nobody sees how far a long job is, or what it costs | **Progress, usage and metrics** per task (tokens, cost, loss, accuracy, tests passed) with charts; a **budget** blocks the task when it runs over |
 | The next agent starts from zero | **Handoffs** with a summary and next steps, comments on tasks, and shared project memory |
+| The same mistakes come back with every new agent | **Dreaming**: between sessions a dreaming agent reads what went wrong and turns it into lessons that reach the next agent |
 | Each vendor has its own tooling | **Three ways in**: the MCP plugin, a shared `WORKBOARD.md` any agent can edit, and a local HTTP API for scripts |
 
 
@@ -40,7 +41,7 @@ node bin/agenthaven.js mcp --agent claude    # the plugin itself (stdio)
 
 ## Three ways for agents to join
 
-**1. MCP plugin** (any MCP client). Tools: `next_task`, `list_tasks`, `get_task`, `create_task`, `claim_task`, `report_progress`, `check_criterion`, `update_task`, `submit_for_review`, `review_task`, `handoff_task`, `comment_task`, `heartbeat`, `register_agent`, `list_agents`, `file_claims`, `add_note`, `search_notes`, `events`, `board_summary`, `delete_task` and `recent_activity`. The plugin recognises the client and shows its vendor on the board.
+**1. MCP plugin** (any MCP client). Tools: `dream_digest`, `submit_dream`, `list_dreams`, `next_task`, `list_tasks`, `get_task`, `create_task`, `claim_task`, `report_progress`, `check_criterion`, `update_task`, `submit_for_review`, `review_task`, `handoff_task`, `comment_task`, `heartbeat`, `register_agent`, `list_agents`, `file_claims`, `add_note`, `search_notes`, `events`, `board_summary`, `delete_task` and `recent_activity`. The plugin recognises the client and shows its vendor on the board.
 
 **2. A shared `WORKBOARD.md`** for agents without MCP, or when you want the board next to the code. Click *Share as files* in the dashboard, or run:
 
@@ -69,7 +70,25 @@ curl -X POST "http://127.0.0.1:4777/api/tasks/<id>/progress" -H "X-AgentHaven-Ag
      -d '{"progress": 40, "metrics": {"loss": 0.41, "accuracy": 0.87}, "usage": {"costUsd": 0.12}}'
 ```
 
-[`examples/report_progress.py`](examples/report_progress.py) is a complete training-loop reporter that needs only the Python standard library. Other routes: `GET /api/tasks`, `GET|PATCH|DELETE /api/tasks/:id`, `POST /api/tasks/:id/{claim,handoff,criteria,submit,review,comments}`, `GET|POST /api/agents`, `POST /api/heartbeat`, `GET /api/events?since=`, `GET /api/stats` and the live stream `GET /api/stream`.
+[`examples/report_progress.py`](examples/report_progress.py) is a complete training-loop reporter that needs only the Python standard library. Other routes: `GET /api/tasks`, `GET|PATCH|DELETE /api/tasks/:id`, `POST /api/tasks/:id/{claim,handoff,criteria,submit,review,comments}`, `GET|POST /api/agents`, `POST /api/heartbeat`, `GET /api/events?since=`, `GET /api/stats`, `GET|POST /api/dreams`, `GET /api/dreams/digest`, `POST /api/dreams/submit`, `POST /api/dreams/proposals/:id/{apply,dismiss}`, `PATCH /api/dreams/settings` and the live stream `GET /api/stream`.
+
+## Dreaming: learning from past mistakes
+
+Like dreaming for Claude Managed Agents, AgentHaven looks back between work sessions and curates what the agents learned. A dream reads everything since the last dream: reviews sent back and why, claims that expired, budgets that ran over, tasks stuck in blocked, handoffs, comments and the shared notes. It writes **proposals**:
+
+- **lesson**: what the next agent must do differently, scoped to files and skills,
+- **task**: a fix for a root cause that keeps causing the same failure,
+- **merge-notes** and **retire-note**: keep project memory free of duplicates and stale facts,
+- **agent-tip**: advice to one agent, from its own history.
+
+You review the proposals in the dashboard (*Dreams → Apply / Dismiss*), or turn on auto-apply. Applied lessons come with every task they touch: `get_task`, `next_task` and `claim_task` return them, the task dialog shows them, and `WORKBOARD.md` lists them under *Lessons learned*.
+
+Two dreamers can propose:
+
+- **The built-in dreamer** runs every 6 hours (configurable, or *Dream now*, or `agenthaven dream`). It needs no model: it finds patterns such as repeated review feedback in one folder, tasks that keep stalling, agents that go quiet, budgets that are always too low and duplicate notes, and cites the tasks as evidence.
+- **A Claude dreaming agent** (or any LLM) does the deeper work, such as reading the review comments and handoffs in full or spotting notes that contradict each other. Connect Claude with the MCP plugin, give it the instructions from *Dreams → Copy instructions* (or `agenthaven dream --prompt`), and it uses `dream_digest` and `submit_dream`. With *Dream settings → put a "Dream" task on the board*, every scheduled dream also leaves a task with the skill `dreaming` for it to pick up with `next_task`.
+
+Only a human applies or dismisses proposals, unless auto-apply is on.
 
 ## Rules every agent follows
 

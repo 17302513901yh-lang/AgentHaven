@@ -5,6 +5,7 @@
 // Windsurf, Zed, local model runners, ...
 const readline = require('node:readline');
 const { Store, STATUSES, AGENT_KINDS } = require('./store');
+const dreams = require('./dream');
 const pkg = require('../package.json');
 
 const PROTOCOL_VERSIONS = ['2025-11-25', '2025-06-18', '2025-03-26', '2024-11-05'];
@@ -27,19 +28,19 @@ const taskFields = {
 const TOOLS = [
   { name: 'next_task', description: 'Get the most important task you can start right now (priority, dependencies done, files free, your skills). Set claim=true to claim it in the same step. Start every session with this or list_tasks.',
     inputSchema: { type: 'object', properties: { claim: { type: 'boolean', description: 'Claim the task immediately (recommended)' } } },
-    run: (s, a, actor) => s.nextTask({ actor, claim: Boolean(a.claim) }) },
+    run: (s, a, actor) => withLessons(s, s.nextTask({ actor, claim: Boolean(a.claim) }), actor) },
   { name: 'list_tasks', description: 'List tasks on the shared board (compact). Shows who works on what, priorities and what each task waits on.',
     inputSchema: { type: 'object', properties: { status: { type: 'string', enum: STATUSES }, assignee: str('Filter by agent name') } },
     run: (s, a) => s.listTasks(a) },
-  { name: 'get_task', description: 'Get one task in full: description, criteria, comments, handoff history, metrics and its version.',
+  { name: 'get_task', description: 'Get one task in full: description, criteria, comments, handoff history, metrics, its version, and the lessons learned that apply to it. Read the lessons before you start.',
     inputSchema: { type: 'object', properties: id, required: ['id'] },
-    run: (s, a) => s.getTask(a.id) },
+    run: (s, a, actor) => { const t = s.getTask(a.id); return { ...t, lessons: dreams.lessonsFor(s, t, { agent: actor }) }; } },
   { name: 'create_task', description: 'Add a task to the shared board. Split big work into tasks with dependsOn, list the files, and add acceptance criteria.',
     inputSchema: { type: 'object', properties: { title: str('Short, specific title'), ...taskFields }, required: ['title'] },
     run: (s, a, actor) => s.createTask({ ...a, actor }) },
   { name: 'claim_task', description: 'Claim a task. Fails when someone else holds it, its dependencies are not done, or another agent is working on its files. The claim expires after 30 minutes without activity from you.',
     inputSchema: { type: 'object', properties: id, required: ['id'] },
-    run: (s, a, actor) => s.claimTask(a.id, { actor }) },
+    run: (s, a, actor) => { const t = s.claimTask(a.id, { actor }); return { ...t, lessons: dreams.lessonsFor(s, t, { agent: actor }) }; } },
   { name: 'report_progress', description: 'Report progress on your task: percent, a short message, usage (tokens, cost in USD, added to the total) and metrics (e.g. loss, accuracy, tests passed). Renews your claim. Exceeding the task budget blocks it.',
     inputSchema: { type: 'object', properties: { ...id, progress: { type: 'number', minimum: 0, maximum: 100 }, message: str('What you are doing now'),
       usage: { type: 'object', properties: { tokens: { type: 'number' }, costUsd: { type: 'number' } } },
@@ -87,6 +88,20 @@ const TOOLS = [
   { name: 'board_summary', description: 'Counts per status, spend, and agents online.',
     inputSchema: { type: 'object', properties: {} },
     run: (s) => s.stats() },
+  { name: 'dream_digest', description: 'For the dreaming agent: everything since the last dream (reviews sent back and why, expired claims, budget overruns, stuck tasks, handoffs, comments, all notes, open proposals). Read it, look for patterns, then call submit_dream.',
+    inputSchema: { type: 'object', properties: { since: { type: 'integer', minimum: 0, description: 'Event cursor; omit for "since the last dream"' } } },
+    run: (s, a) => dreams.digest(s, a) },
+  { name: 'submit_dream', description: 'For the dreaming agent: record what you learned as proposals. Kinds: lesson (title, body, scope {files, skills}), task (title, body, task {priority, files, skills}), merge-notes (notes: [ids], body = merged text), retire-note (note: id), agent-tip (agent, title, body). Add evidence: [task or note ids]. A human reviews them unless auto-apply is on.',
+    inputSchema: { type: 'object', properties: { summary: str('What you noticed, in a few sentences'),
+      proposals: { type: 'array', items: { type: 'object', properties: { kind: { type: 'string', enum: dreams.KINDS }, title: { type: 'string' }, body: { type: 'string' },
+        scope: { type: 'object', properties: { files: { type: 'array', items: { type: 'string' } }, skills: { type: 'array', items: { type: 'string' } } } },
+        task: { type: 'object', properties: { priority: { type: 'integer' }, files: { type: 'array', items: { type: 'string' } }, skills: { type: 'array', items: { type: 'string' } } } },
+        notes: { type: 'array', items: { type: 'string' } }, note: { type: 'string' }, agent: { type: 'string' }, evidence: { type: 'array', items: { type: 'string' } } }, required: ['kind', 'title', 'body'] } } },
+      required: ['summary', 'proposals'] },
+    run: (s, a, actor) => dreams.recordDream(s, { actor, summary: a.summary, proposals: a.proposals || [] }) },
+  { name: 'list_dreams', description: 'Recent dreams and their proposals (proposed, applied or dismissed).',
+    inputSchema: { type: 'object', properties: { limit: { type: 'integer', minimum: 1, maximum: 50 } } },
+    run: (s, a) => dreams.listDreams(s, a) },
   { name: 'delete_task', description: 'Delete a task (e.g. a duplicate). Pass the version you last read.',
     inputSchema: { type: 'object', properties: { ...id, version: { type: 'integer' } }, required: ['id', 'version'] },
     run: (s, a, actor) => s.deleteTask(a.id, { version: a.version, actor }) },
@@ -103,9 +118,16 @@ const VENDORS = [
 ];
 const vendorOf = (name = '') => VENDORS.find(([re]) => re.test(name))?.[1];
 
+// Attaches the lessons learned that apply to a picked task.
+function withLessons(store, res, actor) {
+  if (res.task) res.task = { ...res.task, lessons: dreams.lessonsFor(store, res.task, { agent: actor }) };
+  return res;
+}
+
 const INSTRUCTIONS = [
   'AgentHaven is a shared work board for all AI agents and people on this project, whatever their vendor.',
   'Start with next_task (claim=true) or list_tasks. Work only on tasks you have claimed, and list the files you touch on your task: claims fail when another agent is working on those files.',
+  'Read the lessons that come with a task: they are mistakes earlier agents made here.',
   'Call report_progress while you work (with usage and metrics when you have them); a claim expires after 30 minutes of silence.',
   'Finish with submit_for_review (or update_task status "done" when no review is needed), or handoff_task with what you did and what is next. Read comments on your task; answer with comment_task.',
 ].join(' ');

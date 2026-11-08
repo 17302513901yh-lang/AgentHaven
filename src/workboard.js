@@ -13,6 +13,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { STATUSES } = require('./store');
+const dreams = require('./dream');
 const pkg = require('../package.json');
 
 const BOARD = 'WORKBOARD.md';
@@ -130,6 +131,19 @@ function renderBoard(store, { results = [] } = {}) {
     line();
   }
 
+  const lessons = store.listNotes().filter((n) => n.tags.includes('lesson')).slice(-8).reverse();
+  if (lessons.length) {
+    line('## Lessons learned');
+    line();
+    line('Mistakes made here before, found by the dreaming agent. Read the ones that touch your files or skills.');
+    line();
+    for (const n of lessons) {
+      const scope = [...(n.scope?.files || []), ...(n.scope?.skills || []).map((s) => `skill:${s}`), ...(n.scope?.agent ? [`agent:${n.scope.agent}`] : [])];
+      line(`- **${cell(n.title)}**${scope.length ? ` (${cell(scope.join(', '))})` : ''} — ${cell(n.body).slice(0, 400)}`);
+    }
+    line();
+  }
+
   line('## Agents');
   line();
   if (!agents.length) line('_No agents yet. Say hello in the Inbox._');
@@ -221,6 +235,11 @@ function parseNew(rest) {
   return opts;
 }
 
+const lessonHint = (store, task, actor) => {
+  const l = dreams.lessonsFor(store, task, { agent: actor });
+  return l.length ? `. Read first — lessons: ${l.map((x) => `"${x.title}"`).join('; ')}` : '';
+};
+
 // Applies one Inbox line. Returns { ok, message }.
 function applyCommand(store, raw) {
   const m = raw.match(/^([^:\s]+)\s*:\s*(\S+)\s*(.*)$/s);
@@ -244,10 +263,10 @@ function applyCommand(store, raw) {
       }
       case 'next': {
         const r = store.nextTask({ actor, claim: true });
-        if (r.task) return { ok: true, message: `claimed ${r.task.id} "${r.task.title}"` };
+        if (r.task) return { ok: true, message: `claimed ${r.task.id} "${r.task.title}"${lessonHint(store, r.task, actor)}` };
         return { ok: false, message: `${r.hint}${r.skipped?.length ? ` First: ${r.skipped[0]}.` : ''}${r.reviewable?.length ? ` Reviewable: ${r.reviewable.map((t) => t.id).join(', ')}` : ''}` };
       }
-      case 'claim': { const t = store.claimTask(task(), { actor }); return { ok: true, message: `claimed "${t.title}" until ${short(t.leaseUntil)}` }; }
+      case 'claim': { const t = store.claimTask(task(), { actor }); return { ok: true, message: `claimed "${t.title}" until ${short(t.leaseUntil)}${lessonHint(store, t, actor)}` }; }
       case 'progress': {
         const p = parseProgress(after);
         const r = store.reportProgress(task(), { actor, ...p });
