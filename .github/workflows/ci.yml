@@ -61,7 +61,13 @@ jobs:
           extra=""
           if [ -z "$CSC_LINK" ]; then export CSC_IDENTITY_AUTO_DISCOVERY=false; unset CSC_LINK CSC_KEY_PASSWORD; fi
           if [ "${{ matrix.name }}" = macos ] && [ -n "$APPLE_ID" ] && [ -n "$CSC_LINK" ]; then extra="-c.mac.notarize=true"; fi
-          npm run ${{ matrix.script }} -- $extra
+          # electron-builder downloads its tools (NSIS, dmg-builder) while it builds; a 5xx from that
+          # mirror once blocked a release. Retry twice; a real build error fails all three tries.
+          for try in 1 2 3; do
+            npm run ${{ matrix.script }} -- $extra && break
+            if [ "$try" = 3 ]; then exit 1; fi
+            echo "Build attempt $try failed; retrying in 30 s"; sleep 30
+          done
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: AgentHaven-${{ matrix.name }}
