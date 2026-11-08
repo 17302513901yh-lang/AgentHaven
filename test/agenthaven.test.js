@@ -4,7 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFileSync, spawn } = require('node:child_process');
+const { execFile, execFileSync, spawn } = require('node:child_process');
+const { promisify } = require('node:util');
 const { Store } = require('../src/store');
 const { createHandler } = require('../src/mcp');
 const { start } = require('../src/server');
@@ -98,6 +99,31 @@ test('HTTP API: CRUD, conflict status, host/origin protection, UI', async () => 
     const page = await fetch(url);
     assert.match(await page.text(), /AgentHaven/);
     assert.equal((await fetch(`${url}..%2fpackage.json`)).status, 404);
+  } finally {
+    server.close();
+  }
+});
+
+test('Node progress example claims a task, reports metrics and submits for review', async () => {
+  const { dataDir } = tmpStore();
+  const workspace = 'training';
+  const store = new Store({ dataDir, workspace });
+  const task = store.createTask({ title: 'Train the demo model', actor: 'you' });
+  const { server, url } = await start({ dataDir });
+  try {
+    const example = path.join(__dirname, '..', 'examples', 'report_progress.mjs');
+    const { stdout } = await promisify(execFile)(process.execPath, [example], {
+      env: { ...process.env, AGENTHAVEN_URL: url, AGENTHAVEN_AGENT: 'demo-trainer', AGENTHAVEN_WORKSPACE: workspace },
+      timeout: 20_000,
+    });
+    assert.match(stdout, /Sent to review/);
+    const result = store.getTask(task.id);
+    assert.equal(result.assignee, 'demo-trainer');
+    assert.equal(result.status, 'review');
+    assert.equal(result.progress, 100);
+    assert.equal(result.metrics.loss.length, 10);
+    assert.equal(result.metrics.accuracy.length, 10);
+    assert.match(result.verification, /completed all 10 epochs/);
   } finally {
     server.close();
   }
