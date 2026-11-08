@@ -215,7 +215,8 @@ test('hook command: answers over stdio and fails open on bad input', async () =>
 
 test('Claude Code plugin: commands match the prompts, manifests match the package', () => {
   for (const [name, text] of Object.entries(commands.files())) {
-    assert.equal(fs.readFileSync(path.join(commands.DIR, name), 'utf8'), text, `${name} is stale: run node scripts/claude-commands.js`);
+    // Git on Windows may check the files out with CRLF line endings; compare the text.
+    assert.equal(fs.readFileSync(path.join(commands.DIR, name), 'utf8').replace(/\r\n/g, '\n'), text, `${name} is stale: run node scripts/claude-commands.js`);
   }
   const root = path.join(__dirname, '..');
   const plugin = JSON.parse(fs.readFileSync(path.join(root, '.claude-plugin', 'plugin.json'), 'utf8'));
