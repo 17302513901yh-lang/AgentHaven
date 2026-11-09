@@ -15,6 +15,9 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   const cases = {
     'Anthropic key': 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123',
     'OpenAI key': 'use sk-proj-abcdefghijklmnopqrstuvwx1234 now',
+    'Groq key': 'gsk_abcdefghijklmnopqrstuvwxyz0123456789AB',
+    'SendGrid key': `SG.${'a'.repeat(22)}.${'B'.repeat(43)}`,
+    'Replicate token': 'r8_abcdefghijklmnopqrstuvwxyz0123456789AB',
     'GitHub token': 'ghp_abcdefghijklmnopqrstuvwxyz0123456789',
     'AWS access key': 'AKIAIOSFODNN7EXAMPLE',
     'Google API key': 'AIzaSyA1234567890abcdefghijklmnopqrstuv',
@@ -29,6 +32,19 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   const pw = inspect('DB_PASSWORD=hunter2hunter and postgres://app:s3cretpw@db:5432/x');
   assert.equal(pw.text, 'DB_PASSWORD=[secret removed] and postgres://app:[secret removed]@db:5432/x');
   assert.deepEqual(inspect('Use the task id task_3f9a1c2b4d5e and run npm test').secrets, []);
+  const endingInHyphen = `SG.${'a'.repeat(22)}.${'B'.repeat(42)}-`;
+  for (const suffix of ['', ' done', '\nnext']) {
+    const scanned = inspect(`${endingInHyphen}${suffix}`);
+    assert.deepEqual(scanned.secrets, ['SendGrid key']);
+    assert.ok(!scanned.text.includes(endingInHyphen));
+  }
+  for (const ordinary of [
+    'Set the gsk_project_name variable before testing.',
+    'A short SG.example.key is not a SendGrid credential.',
+    'The r8_model_version identifies a local artifact.',
+    `SG.${'a'.repeat(21)}.${'B'.repeat(43)}`,
+    `SG.${'a'.repeat(22)}.${'B'.repeat(44)}`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
 test('guard: flags injection, strips invisible characters, leaves normal work alone', () => {
@@ -52,11 +68,12 @@ test('guard: secrets never reach the board; humans are told', () => {
   assert.equal(s.getTask(t.id).description, 'token [GitHub token removed]');
   s.comment(t.id, { actor: 'codex', body: 'my key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123' });
   s.addNote({ title: 'Creds', body: 'aws AKIAIOSFODNN7EXAMPLE', actor: 'gemini' });
+  s.sendMessage({ from: 'gemini', to: 'you', body: 'Groq gsk_abcdefghijklmnopqrstuvwxyz0123456789AB', actor: 'gemini' });
   const raw = fs.readFileSync(s.file, 'utf8');
-  for (const leak of ['ghp_abcdefghij', 'sk-ant-api03', 'AKIAIOSFODNN7EXAMPLE']) assert.ok(!raw.includes(leak), leak);
+  for (const leak of ['ghp_abcdefghij', 'sk-ant-api03', 'AKIAIOSFODNN7EXAMPLE', 'gsk_abcdefghijklmnopqrstuvwxyz']) assert.ok(!raw.includes(leak), leak);
   const inbox = s.inbox({ actor: 'you' });
   assert.ok(inbox.messages.some((m) => m.kind === 'guard' && /GitHub token/.test(m.body) && /Rotate/.test(m.body)));
-  assert.equal(s.guardLog().events.length, 3);
+  assert.equal(s.guardLog().events.length, 4);
 });
 
 test('guard: poisoned memory is quarantined until a human releases it', () => {
