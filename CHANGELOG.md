@@ -5,7 +5,13 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
-- `agenthaven tools` lists the MCP tool profiles, and `agenthaven tools <profile>` describes each tool in one. Thanks to @Daiyuanranfeng! (#19, #29)
+## 0.7.0
+
+A closer look at the board from the terminal, and Guard recognises more keys. [Full notes](docs/releases/v0.7.0.md)
+
+- **`agenthaven status`** prints a short summary of the board: the goal, counts per status, who works on what and what waits on a human. Thanks to @IG-ABHINAV for this, their first contribution to AgentHaven! (#16, #28)
+- **`agenthaven tools`** lists the MCP tool profiles, and `agenthaven tools <profile>` describes each tool in one. Thanks to @Daiyuanranfeng! (#19, #29)
+- **Guard removes more provider keys** before anything is stored: Groq (`gsk_`), SendGrid (`SG.`, also keys that end in a hyphen) and Replicate (`r8_`). Thanks to @jdotc1 for the careful patterns and tests, their first contribution to AgentHaven! (#7, #31)
 
 ## 0.6.0
 
