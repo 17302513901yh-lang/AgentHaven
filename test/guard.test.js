@@ -32,11 +32,18 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   const pw = inspect('DB_PASSWORD=hunter2hunter and postgres://app:s3cretpw@db:5432/x');
   assert.equal(pw.text, 'DB_PASSWORD=[secret removed] and postgres://app:[secret removed]@db:5432/x');
   assert.deepEqual(inspect('Use the task id task_3f9a1c2b4d5e and run npm test').secrets, []);
+  const endingInHyphen = `SG.${'a'.repeat(22)}.${'B'.repeat(42)}-`;
+  for (const suffix of ['', ' done', '\nnext']) {
+    const scanned = inspect(`${endingInHyphen}${suffix}`);
+    assert.deepEqual(scanned.secrets, ['SendGrid key']);
+    assert.ok(!scanned.text.includes(endingInHyphen));
+  }
   for (const ordinary of [
     'Set the gsk_project_name variable before testing.',
     'A short SG.example.key is not a SendGrid credential.',
     'The r8_model_version identifies a local artifact.',
     `SG.${'a'.repeat(21)}.${'B'.repeat(43)}`,
+    `SG.${'a'.repeat(22)}.${'B'.repeat(44)}`,
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
