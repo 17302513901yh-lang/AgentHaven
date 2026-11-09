@@ -103,6 +103,7 @@ The **Connect agents** button in the dashboard header shows every app and its st
 ```sh
 node bin/agenthaven.js --version             # print the AgentHaven version
 node bin/agenthaven.js serve                 # dashboard at http://127.0.0.1:4777
+node bin/agenthaven.js status                # short summary: goal, counts, who works on what, what waits on a human
 node bin/agenthaven.js config --agent claude # MCP config snippet for your agent
 node bin/agenthaven.js mcp --agent claude    # the plugin itself (stdio)
 ```
