@@ -1,6 +1,6 @@
 {
   "name": "agenthaven",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "One local work board for AI agents from every vendor: claims with leases, dependencies, review gates, progress, cost and metrics, via MCP, a shared WORKBOARD.md or HTTP.",
   "license": "MIT",
   "author": "laaielichter",
