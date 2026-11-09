@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- `agenthaven tools` lists the MCP tool profiles, and `agenthaven tools <profile>` describes each tool in one. Thanks to @Daiyuanranfeng! (#19, #29)
+
 ## 0.6.0
 
 Seamless: agents connect by themselves, and the desktop app updates from the dashboard. [Full notes](docs/releases/v0.6.0.md)
