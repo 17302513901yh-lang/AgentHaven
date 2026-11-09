@@ -20,7 +20,11 @@ Usage:
   agenthaven serve        [--port 4777] [--workspace name]   open the local dashboard (also runs linked workboard syncs)
   agenthaven mcp          [--agent name] [--workspace name]  run the MCP agent plugin (stdio) for any MCP client
                           [--tools core,code,review,plan,team,lead,dream|all]  tool profiles (default core)
+  agenthaven tools        [profile]                          list MCP tool profiles or describe the tools in one
   agenthaven hook <event> [--agent name]                     editor hook: session-start, pre-tool-use or stop (JSON on stdin)
+  agenthaven connect      [client ...] [--list] [--off client]  connect every installed agent app (Claude Desktop,
+                                                             Claude Code, Cursor, VS Code, Windsurf, Gemini CLI,
+                                                             Codex, LM Studio), or only the ones named
   agenthaven config       [--agent name] [--workspace name]  print an MCP client config snippet
   agenthaven link <folder> [--workspace name]                share the board as WORKBOARD.md + LOGBOOK.md in a folder,
                                                              so agents without MCP can join by editing a file
@@ -47,11 +51,61 @@ switch (cmd) {
   case 'mcp':
     require('../src/mcp').serve({ store: store(), agent: flag('agent', process.env.AGENTHAVEN_AGENT), tools: flag('tools', process.env.AGENTHAVEN_TOOLS) });
     break;
+  case 'tools': {
+    const { PROFILES, TOOLS } = require('../src/mcp');
+    const [profile] = positional;
+    if (profile === undefined) {
+      for (const [name, tools] of Object.entries(PROFILES)) {
+        console.log(`${name.padEnd(7)} ${tools.join(', ')}`);
+      }
+      break;
+    }
+    if (!Object.hasOwn(PROFILES, profile)) {
+      fail(`Unknown tool profile: ${profile}. Use ${Object.keys(PROFILES).join(', ')}.`);
+    }
+    const descriptions = new Map(TOOLS.map(({ name, description }) => [name, description]));
+    for (const name of PROFILES[profile]) {
+      console.log(`${name}: ${descriptions.get(name)}`);
+    }
+    break;
+  }
   case 'serve':
     require('../src/server').start({ port: Number(flag('port', 4777)), store: store(), onError: (err, ws) => console.error(`[workboard ${ws}] ${err.message}`) })
       .then(({ url }) => console.log(`AgentHaven dashboard: ${url}  (data: ${defaultDataDir()})\nEnjoying AgentHaven? A star on GitHub helps other people find it: https://github.com/laaielichter/AgentHaven`))
       .catch((err) => fail(err.message));
     break;
+  case 'connect': {
+    const connect = require('../src/connect');
+    const entryFor = (agent) => connect.nodeEntryFor(agent, workspace);
+    const mark = { connected: '✓ connected', outdated: '↻ outdated', 'not-connected': '○ not connected', plugin: '✓ via plugin', 'broken-config': '! config is not valid JSON', 'not-installed': '· not installed' };
+    const list = () => connect.detect({ entryFor }).forEach((c) => console.log(`${c.label.padEnd(20)} ${mark[c.state]}${c.error ? `  ${c.error}` : ''}`));
+    if (has('list')) { list(); break; }
+    const off = flag('off');
+    if (off) {
+      const c = connect.uninstall(off);
+      const prefs = connect.loadPrefs(defaultDataDir());
+      connect.savePrefs(defaultDataDir(), { ...prefs, off: [...prefs.off, off] });
+      console.log(`Disconnected ${c.label} (${c.file}).`);
+      break;
+    }
+    let results;
+    if (positional.length) {
+      const all = connect.clients();
+      results = positional.map((id) => {
+        if (!all[id]) fail(`unknown client "${id}"; use one of: ${Object.keys(all).join(', ')}`);
+        try { connect.install(id, entryFor(all[id].agent)); return { label: all[id].label, action: 'connected' }; } catch (err) { return { label: all[id].label, action: 'error', error: err.message }; }
+      });
+    } else {
+      results = connect.autoConnect({ entryFor });
+    }
+    for (const r of results) console.log(r.action === 'error' ? `! ${r.label}: ${r.error}` : `✓ ${r.label}: ${r.action}`);
+    if (!results.length) console.log('Every installed agent app is already connected.');
+    else if (results.some((r) => r.action !== 'error')) console.log('\nRestart those apps once to load the AgentHaven tools.');
+    console.log('');
+    list();
+    if (results.some((r) => r.action === 'error')) process.exitCode = 1;
+    break;
+  }
   case 'config': {
     const agent = flag('agent', 'claude');
     console.log(JSON.stringify({ mcpServers: { agenthaven: {

@@ -13,13 +13,14 @@ const workboard = require('./workboard');
 const dreams = require('./dream');
 const checks = require('./checks');
 const gitx = require('./git');
+const connect = require('./connect');
 
 const UI_DIR = path.join(__dirname, '..', 'ui');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
 const AGENT_RE = /^[\w.@-]{1,100}$/;
-const STATUS = { CONFLICT: 409, INVALID: 400, NOT_FOUND: 404 };
+const STATUS = { CONFLICT: 409, INVALID: 400, NOT_FOUND: 404, BROKEN_CONFIG: 400 };
 
-function createServer({ store, dataDir, human = 'you', onError = () => {}, dream = true } = {}) {
+function createServer({ store, dataDir, human = 'you', onError = () => {}, dream = true, connections = {} } = {}) {
   // One Store per workspace, selected with ?workspace=name (default: "default").
   const stores = new Map();
   const watchers = new Map();
@@ -50,7 +51,65 @@ function createServer({ store, dataDir, human = 'you', onError = () => {}, dream
     } catch (err) { onError(err, name); }
   }
 
+  // Agent connections. The desktop app passes its own entryFor (the app runtime) and auto: true.
+  const conn = { entryFor: connect.nodeEntryFor, auto: false, clientOpts: {}, ...connections };
+  const connOpts = { entryFor: conn.entryFor, ...conn.clientOpts };
+  let lastAuto = null;
+  const runAuto = () => {
+    const prefs = connect.loadPrefs(dataDir);
+    if (!prefs.auto) return null;
+    lastAuto = { at: new Date().toISOString(), results: connect.autoConnect({ ...connOpts, off: prefs.off }) };
+    return lastAuto;
+  };
+  const autoTick = () => { try { runAuto(); } catch (err) { onError(err, 'connect'); } };
+  let autoTimer = null;
+  if (conn.auto) {
+    autoTick();
+    // Agents installed later are picked up too.
+    autoTimer = setInterval(autoTick, 10 * 60 * 1000);
+    autoTimer.unref?.();
+  }
+  const humanOnly = (a) => {
+    if (a.asAgent || a.actor !== human) throw Object.assign(new Error('only the person at the dashboard can change agent connections'), { code: 'INVALID' });
+  };
+  const connState = () => ({ ...connect.loadPrefs(dataDir), clients: connect.detect(connOpts), lastAuto, managed: Boolean(conn.auto), notice: conn.notice || null });
+  const knownClient = (id) => {
+    if (!connect.clients(conn.clientOpts)[id]) throw Object.assign(new Error(`unknown client ${id}`), { code: 'NOT_FOUND' });
+    return id;
+  };
+
   const routes = [
+    ['GET', /^\/api\/connections$/, () => connState()],
+    // Connect one client ({ client }) or every installed one ({ all: true }).
+    ['POST', /^\/api\/connections$/, (q, b, a) => {
+      humanOnly(a);
+      const prefs = connect.loadPrefs(dataDir);
+      let results;
+      if (b.all) {
+        connect.savePrefs(dataDir, { ...prefs, off: [] });
+        results = connect.autoConnect({ ...connOpts });
+      } else {
+        const id = knownClient(String(b.client));
+        const c = connect.clients(conn.clientOpts)[id];
+        connect.install(id, conn.entryFor(c.agent), conn.clientOpts);
+        connect.savePrefs(dataDir, { ...prefs, off: prefs.off.filter((x) => x !== id) });
+        results = [{ id, label: c.label, action: 'connected' }];
+      }
+      return { ...connState(), results };
+    }],
+    ['DELETE', /^\/api\/connections\/([\w-]+)$/, (q, b, a, id) => {
+      humanOnly(a);
+      connect.uninstall(knownClient(id), conn.clientOpts);
+      const prefs = connect.loadPrefs(dataDir);
+      connect.savePrefs(dataDir, { ...prefs, off: [...prefs.off, id] });
+      return connState();
+    }],
+    ['PATCH', /^\/api\/connections$/, (q, b, a) => {
+      humanOnly(a);
+      connect.savePrefs(dataDir, { ...connect.loadPrefs(dataDir), auto: b.auto !== false });
+      if (b.auto !== false && conn.auto) runAuto();
+      return connState();
+    }],
     ['GET', /^\/api\/tasks$/, (q, b, a) => a.s.listTasks({ status: q.get('status') || undefined, assignee: q.get('assignee') || undefined })],
     ['POST', /^\/api\/tasks$/, (q, b, a) => a.s.createTask({ ...b, actor: a.actor })],
     ['GET', /^\/api\/tasks\/next$/, (q, b, a) => a.s.nextTask({ actor: a.actor, claim: false })],
@@ -153,7 +212,7 @@ function createServer({ store, dataDir, human = 'you', onError = () => {}, dream
       try { s = pick(url.searchParams); } catch (err) { return send(400, { error: err.message }); }
       const header = req.headers['x-agenthaven-agent'];
       if (header !== undefined && !AGENT_RE.test(header)) return send(400, { error: 'X-AgentHaven-Agent may use letters, digits, . _ - @' });
-      const ctx = { s, actor: header || human };
+      const ctx = { s, actor: header || human, asAgent: header !== undefined };
       if (url.pathname === '/api/stream' && req.method === 'GET') return stream(req, res, s);
       for (const [method, re, fn] of routes) {
         const m = url.pathname.match(re);
@@ -181,7 +240,7 @@ function createServer({ store, dataDir, human = 'you', onError = () => {}, dream
     if (!full.startsWith(UI_DIR + path.sep) || req.method !== 'GET') return send(404, { error: 'not found' });
     fs.readFile(full, (err, data) => (err ? send(404, { error: 'not found' }) : send(200, data, MIME[path.extname(full)] || 'application/octet-stream')));
   });
-  server.on('close', () => { for (const w of [...watchers.values(), ...dreamers.values()]) w.stop(); watchers.clear(); dreamers.clear(); });
+  server.on('close', () => { if (autoTimer) clearInterval(autoTimer); for (const w of [...watchers.values(), ...dreamers.values()]) w.stop(); watchers.clear(); dreamers.clear(); });
   return server;
 }
 

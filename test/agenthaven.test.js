@@ -4,10 +4,10 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
-const { execFile, execFileSync, spawn } = require('node:child_process');
+const { execFile, execFileSync, spawn, spawnSync } = require('node:child_process');
 const { promisify } = require('node:util');
 const { Store } = require('../src/store');
-const { createHandler } = require('../src/mcp');
+const { createHandler, PROFILES, TOOLS } = require('../src/mcp');
 const { start } = require('../src/server');
 
 const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir(), 'ah-')) });
@@ -43,6 +43,32 @@ test('CLI status prints a short summary of the board', () => {
   assert.match(out, /"Ship v1" — in review/);
   const help = execFileSync(process.execPath, [cli, 'help'], { cwd: os.tmpdir(), encoding: 'utf8', env });
   assert.match(help, /agenthaven status/);
+});
+
+test('CLI tools lists profiles and describes a selected profile', () => {
+  const cli = path.join(__dirname, '..', 'bin', 'agenthaven.js');
+  const run = (...args) => execFileSync(process.execPath, [cli, ...args], { encoding: 'utf8' }).trimEnd();
+
+  const profiles = Object.fromEntries(run('tools').split(/\r?\n/).map((line) => {
+    const [name] = line.split(/\s+/, 1);
+    return [name, line.slice(name.length).trim().split(', ')];
+  }));
+  assert.deepEqual(profiles, PROFILES);
+
+  const tools = PROFILES.code.map((name) => TOOLS.find((tool) => tool.name === name));
+  assert.deepEqual(run('tools', 'code').split(/\r?\n/),
+    tools.map(({ name, description }) => `${name}: ${description}`));
+  assert.match(run('--help'), /agenthaven tools\s+\[profile\]/);
+});
+
+test('CLI tools rejects unknown profiles', () => {
+  const cli = path.join(__dirname, '..', 'bin', 'agenthaven.js');
+  for (const profile of ['unknown-profile', 'constructor']) {
+    const result = spawnSync(process.execPath, [cli, 'tools', profile], { encoding: 'utf8' });
+    assert.equal(result.status, 1);
+    assert.equal(result.stdout, '');
+    assert.match(result.stderr, new RegExp(`Unknown tool profile: ${profile}`));
+  }
 });
 
 test('tasks: create, claim, conflict-safe update, handoff, activity', () => {

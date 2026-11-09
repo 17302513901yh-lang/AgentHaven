@@ -247,7 +247,8 @@ test('Claude Code plugin: commands match the prompts, manifests match the packag
   const hooksJson = JSON.parse(fs.readFileSync(path.join(root, plugin.hooks), 'utf8'));
   for (const event of ['SessionStart', 'PreToolUse', 'Stop']) {
     const cmd = hooksJson.hooks[event][0].hooks[0].command;
-    assert.match(cmd, /\$\{CLAUDE_PLUGIN_ROOT\}\/bin\/agenthaven\.js" hook /);
+    // Through the launcher, which falls back to the desktop app's runtime without Node.js.
+    assert.match(cmd, /^sh "\$\{CLAUDE_PLUGIN_ROOT\}\/claude\/run\.sh" hook /);
     assert.ok(hooks.HOOKS[cmd.split(' hook ')[1].split(' ')[0]], `${event} runs a known hook`);
   }
   const mcp = JSON.parse(fs.readFileSync(path.join(root, plugin.mcpServers), 'utf8'));

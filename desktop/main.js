@@ -1,14 +1,19 @@
 'use strict';
 // AgentHaven desktop app (Windows + macOS) — Electron shell around the local
 // dashboard server. Agents connect through the bundled MCP plugin.
+const fs = require('node:fs');
+const os = require('node:os');
 const path = require('node:path');
-const { app, BrowserWindow, Menu, clipboard, dialog, shell } = require('electron');
+const { spawnSync } = require('node:child_process');
+const { app, BrowserWindow, Menu, clipboard, dialog, ipcMain, shell } = require('electron');
+const { createUpdater } = require('./updater');
 const { start } = require('../src/server');
 const { defaultDataDir } = require('../src/store');
 const connect = require('../src/connect');
 
 let win;
 let url;
+let updater = null;
 
 // The packaged app executable doubles as a Node runtime for the plugin.
 const entry = (agent) => connect.serverEntry({
@@ -21,7 +26,7 @@ const entry = (agent) => connect.serverEntry({
 function createWindow() {
   win = new BrowserWindow({
     width: 1280, height: 820, minWidth: 720, minHeight: 500, title: 'AgentHaven', backgroundColor: '#f7f7ee', show: false,
-    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false },
+    webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, preload: path.join(__dirname, 'preload.js') },
   });
   win.once('ready-to-show', () => win.show());
   win.webContents.setWindowOpenHandler(({ url: target }) => {
@@ -30,6 +35,41 @@ function createWindow() {
   });
   win.webContents.on('will-navigate', (e, target) => { if (!target.startsWith(url)) e.preventDefault(); });
   win.loadURL(url);
+}
+
+// Connect agents automatically from the installed app only, and only from a place it stays:
+// a path inside a mounted .dmg or a translocated copy would break after the next restart.
+function connectionSettings() {
+  const exe = process.execPath;
+  const temporary = process.platform === 'darwin' && (/^\/Volumes\//.test(exe) || /AppTranslocation/.test(exe));
+  return {
+    entryFor: (agent) => entry(agent),
+    auto: app.isPackaged && !temporary,
+    notice: !app.isPackaged ? 'Development build: agents are not connected automatically. Use Connect to try it.'
+      : temporary ? 'Move AgentHaven to the Applications folder first, then open it again: agents are connected automatically from there.' : null,
+  };
+}
+
+// The Claude Code plugin's launcher (claude/run.sh) uses this app's runtime when Node.js is
+// not installed. Written on every start, so it follows the app when it moves.
+function recordRuntime() {
+  const settings = connectionSettings();
+  if (!settings.auto) return;
+  try {
+    const dir = path.join(os.homedir(), '.agenthaven');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, 'runtime'), `${process.execPath}\n`);
+  } catch { /* the plugin then needs Node.js */ }
+}
+
+function connectAll() {
+  const results = connect.autoConnect({ entryFor: entry });
+  const done = results.filter((r) => r.action !== 'error').map((r) => r.label);
+  const failed = results.filter((r) => r.action === 'error');
+  dialog.showMessageBox(win, {
+    message: done.length ? `AgentHaven connected to ${done.join(', ')}` : failed.length ? 'Some agents could not be connected' : 'All installed agents are already connected',
+    detail: [done.length ? 'Restart those apps once to load the AgentHaven tools.' : '', ...failed.map((r) => `${r.label}: ${r.error}`)].filter(Boolean).join('\n'),
+  });
 }
 
 function installInto(clientId, agent) {
@@ -57,18 +97,23 @@ function buildMenu() {
     ] },
     { role: 'editMenu' },
     { label: 'Agents', submenu: [
+      { label: 'Connect All Installed Agents', click: () => connectAll() },
+      { type: 'separator' },
       { label: 'Connect Claude Desktop', click: () => installInto('claude', 'claude') },
       { label: 'Connect Cursor', click: () => installInto('cursor', 'cursor') },
+      { label: 'Connect Claude Code', click: () => installInto('claude-code', 'claude-code') },
+      { label: 'Connect VS Code (Copilot)', click: () => installInto('vscode', 'copilot') },
       { label: 'Connect Windsurf', click: () => installInto('windsurf', 'windsurf') },
       { label: 'Connect Gemini CLI', click: () => installInto('gemini', 'gemini') },
       { label: 'Connect Codex', click: () => installInto('codex', 'codex') },
+      { label: 'Connect LM Studio', click: () => installInto('lmstudio', 'lmstudio') },
       { type: 'separator' },
-      { label: 'Copy MCP Config (Claude Code, VS Code, Copilot, Zed, …)', click: () => copyConfig('agent') },
+      { label: 'Copy MCP Config (Zed, JetBrains, other clients…)', click: () => copyConfig('agent') },
     ] },
     { role: 'viewMenu' },
     { role: 'windowMenu' },
     { role: 'help', submenu: [
-      { label: 'Check for Updates…', enabled: app.isPackaged, click: () => checkForUpdates(true) },
+      { label: 'Check for Updates…', enabled: app.isPackaged, click: () => checkForUpdates() },
       { label: 'AgentHaven on GitHub', click: () => shell.openExternal('https://github.com/laaielichter/AgentHaven') },
       { label: 'Star AgentHaven on GitHub ⭐', click: () => shell.openExternal('https://github.com/laaielichter/AgentHaven/stargazers') },
       { label: 'Contribute: Good First Issues', click: () => shell.openExternal('https://github.com/laaielichter/AgentHaven/contribute') },
@@ -76,19 +121,89 @@ function buildMenu() {
   ]));
 }
 
-// Updates come from GitHub Releases (electron-updater). macOS requires a
-// signed build for auto-update; errors are only shown when the user asked.
-function checkForUpdates(manual = false) {
+// ---- automatic updates (see updater.js) --------------------------------------------
+
+// An unsigned macOS build is ad-hoc signed by electron-builder; Squirrel.Mac cannot update it.
+function isAdhocMac() {
+  if (process.platform !== 'darwin') return false;
+  const bundle = path.resolve(process.execPath, '..', '..', '..');
+  const r = spawnSync('codesign', ['-dv', bundle], { encoding: 'utf8' });
+  if (r.status !== 0) return true;
+  return /Signature=adhoc/.test(`${r.stdout}${r.stderr}`) || !/TeamIdentifier=(?!not set)\S+/.test(`${r.stdout}${r.stderr}`);
+}
+
+// Download a file to the Downloads folder through Chromium's downloader, with progress.
+function downloadFile(target, onProgress) {
+  return new Promise((resolve, reject) => {
+    const ses = win.webContents.session;
+    const onWill = (_e, item) => {
+      if (item.getURLChain()[0] !== target) return;
+      ses.removeListener('will-download', onWill);
+      const file = path.join(app.getPath('downloads'), item.getFilename());
+      item.setSavePath(file);
+      const started = Date.now();
+      item.on('updated', () => {
+        const total = item.getTotalBytes(); const transferred = item.getReceivedBytes();
+        const secs = Math.max((Date.now() - started) / 1000, 0.1);
+        onProgress({ percent: total ? Math.round((transferred / total) * 100) : 0, transferred, total, bytesPerSecond: Math.round(transferred / secs) });
+        win?.setProgressBar(total ? transferred / total : 2);
+      });
+      item.once('done', (_ev, st) => {
+        win?.setProgressBar(-1);
+        if (st === 'completed') resolve(file); else reject(new Error(`Download ${st}.`));
+      });
+    };
+    ses.on('will-download', onWill);
+    ses.downloadURL(target);
+  });
+}
+
+function setupUpdates() {
+  // The dashboard page may only talk to the updater from the app's own local origin.
+  const fromApp = (e) => Boolean(url) && e.senderFrame && e.senderFrame.url.startsWith(url);
+  const handle = (channel, fn) => ipcMain.handle(channel, (e, ...args) => {
+    if (!fromApp(e)) throw new Error('Not allowed');
+    if (!updater) return { status: 'unsupported', reason: app.isPackaged ? 'Updates are not available on this system.' : 'Updates work in the installed app, not in a development build.' };
+    return fn(...args);
+  });
+  handle('updates:get', () => updater.get());
+  handle('updates:check', () => updater.check({ manual: true }));
+  handle('updates:download', () => updater.download());
+  handle('updates:install', () => updater.install());
+  handle('updates:skip', () => updater.skip());
+  handle('updates:auto', (on) => updater.setAutoCheck(on === true));
+  handle('updates:seen', () => updater.dismissWhatsNew());
+  handle('updates:releases', () => shell.openExternal(updater.get().releaseUrl));
+
+  if (!app.isPackaged || !['win32', 'darwin'].includes(process.platform)) return;
   let autoUpdater;
   try { ({ autoUpdater } = require('electron-updater')); } catch { return; }
-  autoUpdater.autoDownload = true;
-  autoUpdater.once('update-downloaded', (info) => {
-    dialog.showMessageBox(win, { message: `AgentHaven ${info.version} is ready`, detail: 'Restart to install the update.', buttons: ['Restart now', 'Later'] })
-      .then(({ response }) => { if (response === 0) autoUpdater.quitAndInstall(); });
+  updater = createUpdater({
+    autoUpdater,
+    currentVersion: app.getVersion(),
+    platform: process.platform,
+    manualInstall: isAdhocMac(),
+    settingsFile: path.join(app.getPath('userData'), 'updates.json'),
+    send: (state) => {
+      if (win && !win.isDestroyed()) win.webContents.send('updates:state', state);
+      if (state.status === 'downloading' && !state.manualInstall) win?.setProgressBar(state.percent / 100);
+      if (state.status !== 'downloading' && !state.manualInstall) win?.setProgressBar(-1);
+    },
+    downloadFile,
+    openFile: (file) => shell.openPath(file),
+    openExternal: (target) => shell.openExternal(target),
+    quit: () => app.quit(),
   });
-  autoUpdater.checkForUpdates()
-    .then((r) => { if (manual && !r?.isUpdateAvailable) dialog.showMessageBox(win, { message: 'AgentHaven is up to date.' }); })
-    .catch((err) => { if (manual) dialog.showErrorBox('Update check failed', err.message); });
+  updater.start();
+}
+
+// Help → Check for Updates: the result shows in the dashboard's update bar.
+function checkForUpdates() {
+  if (!updater) { dialog.showMessageBox(win, { message: 'Updates work in the installed app.' }); return; }
+  updater.check({ manual: true }).then((s) => {
+    if (s.status === 'up-to-date') dialog.showMessageBox(win, { message: `AgentHaven ${s.currentVersion} is up to date.` });
+    else if (s.status === 'error') dialog.showMessageBox(win, { type: 'warning', message: 'Update check failed', detail: s.error });
+  });
 }
 
 if (!app.requestSingleInstanceLock()) {
@@ -96,10 +211,11 @@ if (!app.requestSingleInstanceLock()) {
 } else {
   app.on('second-instance', () => { if (win) { if (win.isMinimized()) win.restore(); win.focus(); } });
   app.whenReady().then(async () => {
-    ({ url } = await start({ dataDir: defaultDataDir() }));
+    recordRuntime();
+    ({ url } = await start({ dataDir: defaultDataDir(), connections: connectionSettings() }));
     buildMenu();
     createWindow();
-    if (app.isPackaged) checkForUpdates(false);
+    setupUpdates();
     app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
   }).catch((err) => { dialog.showErrorBox('AgentHaven could not start', err.message); app.quit(); });
   app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
