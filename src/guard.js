@@ -16,6 +16,14 @@
 // human (or the lead) releases them. Flagged comments, messages and answers
 // are delivered with a warning, so agents treat them as data, not orders.
 
+// Discord bot tokens begin with a base64url-encoded decimal snowflake (user ID).
+// Validate that segment so unrelated dot-separated strings are not redacted.
+function isDiscordBotToken(token) {
+  const encodedId = token.slice(0, token.indexOf('.'));
+  const id = Buffer.from(encodedId, 'base64url').toString('utf8');
+  return /^\d{17,20}$/.test(id) && Buffer.from(id).toString('base64url') === encodedId;
+}
+
 const SECRET_RULES = [
   ['private key', /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z ]+ )?PRIVATE KEY-----|$)/g],
   ['Anthropic key', /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
@@ -23,6 +31,7 @@ const SECRET_RULES = [
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
   ['SendGrid key', /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}(?=[^A-Za-z0-9_-]|$)/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
+  ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
   ['AWS access key', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
@@ -56,8 +65,9 @@ function inspect(input) {
   const secrets = [];
   const invisible = (text.match(INVISIBLE) || []).length;
   if (invisible) text = text.replace(INVISIBLE, '');
-  for (const [kind, re] of SECRET_RULES) {
+  for (const [kind, re, valid] of SECRET_RULES) {
     text = text.replace(re, (...m) => {
+      if (valid && !valid(m[0])) return m[0];
       secrets.push(kind);
       // Keep the key name or URL around a password, replace only the secret itself.
       if (kind === 'password') return `${m[1]}[secret removed]`;
