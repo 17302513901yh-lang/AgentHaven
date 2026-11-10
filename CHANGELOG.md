@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard removes Discord bot tokens** before anything is stored, next to the Groq, SendGrid and Replicate keys of 0.7.0. Thanks to @jdotc1 for the follow-up! (#33)
+
 ## 0.7.0
 
 A closer look at the board from the terminal, and Guard recognises more keys. [Full notes](docs/releases/v0.7.0.md)
