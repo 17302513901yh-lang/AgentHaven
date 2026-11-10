@@ -53,8 +53,6 @@ On Claude Code before 2.1.275, use `/plugin marketplace add laaielichter/AgentHa
 npx -y github:laaielichter/AgentHaven mcp --agent codex
 ```
 
-See the [MCP client setup guide](docs/guides/clients.md) for Codex, Gemini CLI, and Cursor.
-
 and ask it: *"Take the next task from the AgentHaven board."* Or connect every agent app on your computer at once:
 
 ```sh
@@ -62,6 +60,7 @@ npx -y github:laaielichter/AgentHaven connect
 ```
 
 Prefer an app? The [desktop app](#install) connects your agent apps by itself.
+For manual configuration, see the [MCP client setup guide](docs/guides/clients.md).
 
 ## Why AgentHaven
 

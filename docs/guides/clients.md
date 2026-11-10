@@ -1,8 +1,14 @@
 # Connect an MCP Client
 
-Use Node.js 20 or later with `npx` on your PATH. Each example starts AgentHaven
-over stdio. Merge the entry into your existing configuration and restart the
-client. Choose a distinct `--agent` name for each client sharing your board.
+With Node.js 20 or later, run `npx -y github:laaielichter/AgentHaven connect` to
+configure detected clients, or use `agenthaven connect cursor codex gemini` to
+select clients explicitly if AgentHaven is already installed. Use
+`agenthaven connect --list` to check their connection status. The desktop app
+configures detected clients automatically by default.
+
+For manual setup, use the stdio examples below. Merge the entry into your
+existing configuration and restart the client. Choose a distinct `--agent` name
+for each client sharing your board.
 
 AgentHaven starts with the core tools. Ask the client to call `enable_tools`
 when it needs more. If the client does not refresh its tool list during a
@@ -32,9 +38,10 @@ command = "node"
 args = ["/path/to/AgentHaven/bin/agenthaven.js", "mcp", "--agent", "codex"]
 ```
 
-In the Codex CLI, use `/mcp` to check that AgentHaven is connected. Use plain
-language to request a workflow, such as asking Codex to show the AgentHaven
-board status. See the [Codex MCP documentation](https://developers.openai.com/codex/mcp).
+In the Codex CLI, use `/mcp` to check that AgentHaven's tools are available.
+AgentHaven prompt discovery as slash commands was not verified in Codex. To run
+a workflow, ask in plain language, such as asking Codex to show the AgentHaven
+board status. See the [Codex MCP documentation](https://learn.chatgpt.com/docs/extend/mcp?surface=cli).
 
 ## Gemini CLI
 
@@ -51,9 +58,10 @@ Add the server under `mcpServers` in `~/.gemini/settings.json`.
 }
 ```
 
-Check the connection with `/mcp`. Gemini CLI exposes discovered MCP prompts by
-name, so you can use `/next`, `/handoff`, `/review`, `/status`, `/plan`, or
-`/dream`. See the [Gemini CLI MCP guide](https://geminicli.com/docs/tools/mcp-server/#mcp-prompts-as-slash-commands).
+Check the connection and discovered prompts with `/mcp`. According to the
+[Gemini CLI MCP guide](https://geminicli.com/docs/tools/mcp-server/#mcp-prompts-as-slash-commands),
+Gemini CLI can invoke discovered MCP prompts by name. For example, use `/next`
+if it appears under AgentHaven's prompts.
 
 ## Cursor
 
@@ -71,7 +79,7 @@ Use `~/.cursor/mcp.json` for all projects or `.cursor/mcp.json` in a specific pr
 }
 ```
 
-Check that AgentHaven is enabled in Cursor's MCP settings. Cursor supports MCP
-prompts, and you can also ask the agent for a workflow in plain language, such
-as asking it to use AgentHaven to find the next task. See the
-[Cursor MCP documentation](https://cursor.com/docs/mcp).
+Check that AgentHaven is enabled in Cursor's MCP settings. The
+[Cursor MCP documentation](https://cursor.com/docs/mcp) lists prompt support.
+If AgentHaven's prompts do not appear in your client, ask in plain language,
+such as asking the agent to use AgentHaven to find the next task.
