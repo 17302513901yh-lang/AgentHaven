@@ -49,10 +49,15 @@ const SECRET_RULES = [
 // Zero-width and bidi controls, and the Unicode "tag" block used to hide text from people.
 const INVISIBLE = /[\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]|[\u{E0000}-\u{E007F}]/gu;
 
+// Allow short line breaks in an instruction override, but not a sentence break.
+// The additional alternatives target commands to discard the surrounding context,
+// without treating ordinary references to an "above warning" as an override.
+const OVERRIDE_INSTRUCTIONS = /\b(?:ignore|disregard|forget|override)\b(?:[^.]{0,40}\b(?:previous|prior|above|earlier|all|your|system)\b[^.]{0,20}\b(?:instructions?|prompts?|rules?|guidelines?|directions?)\b|\s+(?:the\s+above\s+(?:and|then)\s+(?:approve|accept|obey|execute|proceed)\b|everything\s+above\s+this\s+line\b|what\s+you\s+were\s+told\s+earlier\b))/i;
+
 const INJECTION_RULES = [
-  ['tries to override instructions', /\b(?:ignore|disregard|forget|override)\b[^.\n]{0,40}\b(?:previous|prior|above|earlier|all|your|system)\b[^.\n]{0,20}\b(?:instructions?|prompts?|rules?|guidelines?|directions?)/i],
+  ['tries to override instructions', OVERRIDE_INSTRUCTIONS],
   ['claims a new role or system prompt', /\b(?:you are now|from now on,? you (?:are|will|must)|new system prompt|act as (?:an? )?(?:admin|root|developer mode|dan)\b|<\/?system>|\[\/?INST\]|<\|im_start\|>)/i],
-  ['asks to hide something from people', /\b(?:do not|don't|never) (?:tell|inform|mention (?:this )?to|show) (?:the )?(?:user|human|humans|maintainer|owner|reviewer)s?\b/i],
+  ['asks to hide something from people', /\b(?:do not|don'?t|never) (?:tell|inform|mention (?:this )?to|show) (?:the )?(?:user|human|humans|maintainer|owner|reviewer)s?\b/i],
   ['asks to send data out', /\b(?:send|post|upload|exfiltrate|forward|leak|paste)\b[^.\n]{0,60}(?:\.env\b|\b(?:secrets?|credentials?|tokens?|api keys?|ssh keys?|passwords?|cookies?)\b)/i],
   ['pipes a download into a shell', /\b(?:curl|wget|iwr|invoke-webrequest)\b[^\n|]{0,200}\|\s*(?:sudo\s+)?(?:ba|z|fi)?sh\b|\biex\s*\(\s*(?:new-object|iwr|invoke-webrequest)/i],
   ['asks to disable safety checks', /\b(?:disable|turn off|bypass|skip)\b[^.\n]{0,30}\b(?:guard|safety|security|review|tests?|checks?|verification|hooks?)\b[^.\n]{0,30}\b(?:for (?:this|all)|always|from now on|silently)\b/i],
