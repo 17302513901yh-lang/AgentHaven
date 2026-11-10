@@ -25,6 +25,7 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
     'AWS access key': 'AKIAIOSFODNN7EXAMPLE',
     'Google API key': 'AIzaSyA1234567890abcdefghijklmnopqrstuv',
     'Slack token': 'xoxb-1234567890-abcdefghij',
+    'PyPI token': 'pypi-' + 'Ab3_'.repeat(22),
     'private key': '-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----',
   };
   for (const [kind, text] of Object.entries(cases)) {
@@ -48,6 +49,21 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
     `SG.${'a'.repeat(21)}.${'B'.repeat(43)}`,
     `SG.${'a'.repeat(22)}.${'B'.repeat(44)}`,
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
+test('guard: PyPI upload tokens are removed without flagging package references', () => {
+  const fakeToken = 'pypi-' + 'Ab3_'.repeat(22);
+  for (const suffix of ['', ' done', '\nnext']) {
+    const result = inspect(`upload credential ${fakeToken}${suffix}`);
+    assert.deepEqual(result.secrets, ['PyPI token']);
+    assert.equal(result.text, `upload credential [PyPI token removed]${suffix}`);
+    assert.ok(!result.text.includes(fakeToken));
+  }
+  for (const harmless of [
+    'Install packages from PyPI with pip',
+    'pypi-' + 'A'.repeat(84),
+    'notpypi-' + 'A'.repeat(90),
+  ]) assert.deepEqual(inspect(harmless).secrets, [], harmless);
 });
 
 test('guard: Discord bot tokens are redacted without catching similar dotted text', () => {
