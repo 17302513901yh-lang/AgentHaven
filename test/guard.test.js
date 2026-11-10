@@ -64,6 +64,21 @@ test('guard: PyPI upload tokens are removed without flagging package references'
     'pypi-' + 'A'.repeat(84),
     'notpypi-' + 'A'.repeat(90),
   ]) assert.deepEqual(inspect(harmless).secrets, [], harmless);
+
+  // Exact minimum length and trailing base64url punctuation must both survive
+  // the boundary check, whether a token ends the input or precedes whitespace.
+  for (const token of [
+    'pypi-' + 'A'.repeat(85),
+    'pypi-' + 'A'.repeat(84) + '-',
+    'pypi-' + 'A'.repeat(84) + '_',
+  ]) {
+    for (const suffix of ['', ' done']) {
+      const scanned = inspect(`upload credential ${token}${suffix}`);
+      assert.deepEqual(scanned.secrets, ['PyPI token'], `${token.slice(-2)}${suffix}`);
+      assert.equal(scanned.text, `upload credential [PyPI token removed]${suffix}`);
+      assert.ok(!scanned.text.includes(token));
+    }
+  }
 });
 
 test('guard: Discord bot tokens are redacted without catching similar dotted text', () => {
