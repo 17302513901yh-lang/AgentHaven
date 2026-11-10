@@ -60,6 +60,7 @@ npx -y github:laaielichter/AgentHaven connect
 ```
 
 Prefer an app? The [desktop app](#install) connects your agent apps by itself.
+For manual configuration, see the [MCP client setup guide](docs/guides/clients.md).
 
 ## Why AgentHaven
 
