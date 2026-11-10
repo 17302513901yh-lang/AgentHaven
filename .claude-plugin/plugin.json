@@ -1,6 +1,6 @@
 {
   "name": "agenthaven",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "One local work board for all your AI agents: file claims that Claude Code respects, leases, review gates, verified checks and handoffs, shared with Codex, Gemini, Cursor and your scripts.",
   "author": { "name": "laaielichter", "url": "https://github.com/laaielichter" },
   "homepage": "https://laaielichter.github.io/AgentHaven/",
