@@ -71,6 +71,72 @@ test('CLI tools rejects unknown profiles', () => {
   }
 });
 
+test('CLI connect --off requires a client before changing configuration', () => {
+  const cli = path.join(__dirname, '..', 'bin', 'agenthaven.js');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-connect-off-'));
+  const env = {
+    ...process.env,
+    HOME: home,
+    USERPROFILE: home,
+    APPDATA: path.join(home, 'appdata'),
+    XDG_CONFIG_HOME: path.join(home, 'config'),
+    CODEX_HOME: path.join(home, 'codex'),
+    AGENTHAVEN_HOME: path.join(home, 'board'),
+    AGENTHAVEN_WORKSPACE: 'default',
+  };
+  const config = path.join(home, '.claude.json');
+  fs.writeFileSync(config, '{}\n');
+  const run = (...args) => spawnSync(process.execPath, [cli, 'connect', ...args], { cwd: home, encoding: 'utf8', env });
+
+  for (const args of [['--off'], ['--off', '--list']]) {
+    const result = run(...args);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /usage: agenthaven connect --off <client>/);
+    assert.match(result.stderr, /claude-code.*cursor.*codex/);
+    assert.equal(fs.readFileSync(config, 'utf8'), '{}\n');
+    assert.equal(fs.existsSync(config + '.agenthaven-backup'), false);
+    assert.equal(fs.existsSync(env.AGENTHAVEN_HOME), false);
+  }
+
+  assert.equal(run('claude-code').status, 0);
+  assert.ok(JSON.parse(fs.readFileSync(config, 'utf8')).mcpServers.agenthaven);
+  assert.equal(run('--off', 'claude-code').status, 0);
+  assert.deepEqual(JSON.parse(fs.readFileSync(config, 'utf8')).mcpServers, {});
+});
+
+test('CLI checks lists saved commands and only clears them explicitly', () => {
+  const cli = path.join(__dirname, '..', 'bin', 'agenthaven.js');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-cli-checks-'));
+  const env = { ...process.env, AGENTHAVEN_HOME: home, AGENTHAVEN_WORKSPACE: 'default' };
+  const run = (...args) => spawnSync(process.execPath, [cli, 'checks', ...args], { cwd: home, encoding: 'utf8', env });
+  const file = path.join(home, 'default.json');
+
+  const empty = run();
+  assert.equal(empty.status, 0);
+  assert.equal(empty.stdout.trim(), 'No checks.');
+  assert.equal(fs.existsSync(file), false);
+
+  const configured = run('npm test', 'npm run lint');
+  assert.equal(configured.status, 0);
+  const before = fs.readFileSync(file);
+  const listed = run();
+  assert.equal(listed.status, 0);
+  assert.deepEqual(listed.stdout.trim().split(/\r?\n/), ['- check 1: npm test', '- check 2: npm run lint']);
+  assert.deepEqual(fs.readFileSync(file), before);
+
+  for (const args of [['--clear', 'npm test'], ['npm test', '--clear'], ['--clear', '--workspace']]) {
+    const mixed = run(...args);
+    assert.equal(mixed.status, 1);
+    assert.match(mixed.stderr, /usage: agenthaven checks --clear/);
+    assert.deepEqual(fs.readFileSync(file), before);
+  }
+
+  const cleared = run('--clear');
+  assert.equal(cleared.status, 0);
+  assert.equal(cleared.stdout.trim(), 'No checks.');
+  assert.deepEqual(new Store({ dataDir: home }).getSettings().checks, []);
+});
+
 test('tasks: create, claim, conflict-safe update, handoff, activity', () => {
   const s = tmpStore();
   const t = s.createTask({ title: 'Write docs', actor: 'claude' });

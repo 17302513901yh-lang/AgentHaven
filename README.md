@@ -203,6 +203,7 @@ Three problems hurt multi-agent work most in practice. AgentHaven handles each o
 
 **Verified checks: proof instead of claims.** Agents report passing tests they never ran, and are known to edit tests until they pass.
 - A human sets the check commands, such as `npm test`. Agents can run them but never change them.
+- Run `agenthaven checks` to list the configured checks, `agenthaven checks "npm test"` to replace them, or `agenthaven checks --clear` to remove them.
 - Submitting for review needs a clean commit and starts the checks on it. AgentHaven runs them itself and keeps a receipt: the commit, each command, its exit code and the end of its output.
 - Approval needs a passing receipt for the submitted commit. A task in its own worktree is done only when its last run passed.
 - Changes to protected paths (test files and CI workflows by default) need a human's approval, even when the checks are green.

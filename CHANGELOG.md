@@ -6,6 +6,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 ## Unreleased
 
 - **Guard removes Discord bot tokens** before anything is stored, next to the Groq, SendGrid and Replicate keys of 0.7.0. Thanks to @jdotc1 for the follow-up! (#33)
+- **CLI settings**: `agenthaven connect --off` requires a client name, and `agenthaven checks` lists the saved commands. Use `agenthaven checks --clear` to remove them. (#43)
 
 ## 0.7.0
 
