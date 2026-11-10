@@ -34,7 +34,8 @@ Usage:
   agenthaven board        [--workspace name]                 print the board as Markdown
   agenthaven status       [--workspace name]                 short summary: goal, counts, who works on what, what waits on a human
   agenthaven repo <path> [--base main]                       human: the git repository this board works on
-  agenthaven checks "<command>" ["<command>" ...]            human: the checks AgentHaven runs before approval
+  agenthaven checks ["<command>" ...] [--workspace name]    list saved checks, or replace them with the commands given
+  agenthaven checks --clear [--workspace name]              clear saved checks
   agenthaven radar                                           files changed on more than one active branch
   agenthaven dream        [--workspace name]                 look back at past mistakes now and propose lessons
   agenthaven dream --prompt                                  print the instructions for a Claude (or other LLM) dreaming agent
@@ -79,8 +80,11 @@ switch (cmd) {
     const entryFor = (agent) => connect.nodeEntryFor(agent, workspace);
     const mark = { connected: '✓ connected', outdated: '↻ outdated', 'not-connected': '○ not connected', plugin: '✓ via plugin', 'broken-config': '! config is not valid JSON', 'not-installed': '· not installed' };
     const list = () => connect.detect({ entryFor }).forEach((c) => console.log(`${c.label.padEnd(20)} ${mark[c.state]}${c.error ? `  ${c.error}` : ''}`));
-    if (has('list')) { list(); break; }
     const off = flag('off');
+    if (has('off') && !off) {
+      fail(`usage: agenthaven connect --off <client>\nClients: ${Object.keys(connect.clients()).join(', ')}`);
+    }
+    if (has('list')) { list(); break; }
     if (off) {
       const c = connect.uninstall(off);
       const prefs = connect.loadPrefs(defaultDataDir());
@@ -179,9 +183,13 @@ switch (cmd) {
     break;
   }
   case 'checks': {
+    const clear = has('clear');
+    if (clear && args.length !== (flag('workspace') ? 3 : 1)) fail('usage: agenthaven checks --clear [--workspace name]');
+    const { settingsOf, setChecks } = require('../src/checks');
+    const s = store();
     const list = positional.map((command, i) => ({ name: positional.length > 1 ? `check ${i + 1}` : 'checks', command }));
-    const r = require('../src/checks').setChecks(store(), { actor: 'you', checks: list });
-    console.log(r.checks.length ? r.checks.map((c) => `- ${c.name}: ${c.command}`).join('\n') : 'No checks.');
+    const { checks } = clear || list.length ? setChecks(s, { actor: 'you', checks: list }) : settingsOf(s);
+    console.log(checks.length ? checks.map((c) => `- ${c.name}: ${c.command}`).join('\n') : 'No checks.');
     break;
   }
   case 'radar': console.log(JSON.stringify(require('../src/git').radar(store()), null, 2)); break;
