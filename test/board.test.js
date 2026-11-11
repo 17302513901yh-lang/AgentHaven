@@ -181,6 +181,45 @@ test('workboard: agents of any vendor collaborate by editing WORKBOARD.md', () =
   assert.equal(fs.readFileSync(path.join(dir, wb.LOGBOOK), 'utf8').split('\n').length, lines, 'the logbook is append-only, no repeats');
 });
 
+test('workboard: a progress line without a valid percentage is refused with a hint', () => {
+  const s = tmpStore();
+  const dir = tmpDir('ah-wb-progress-');
+  const file = path.join(dir, wb.BOARD);
+  wb.syncOnce(s, dir);
+  const add = (...lines) => fs.appendFileSync(file, `${lines.join('\n')}\n`);
+  add('codex: new P1 Add retry');
+  wb.syncOnce(s, dir);
+  const [task] = s.listTasks();
+  const short = task.id.slice(5, 10);
+  add(`codex: claim ${short}`);
+  wb.syncOnce(s, dir);
+  const before = s.getTask(task.id);
+
+  add(`codex: progress ${short} 50 percent tests pass`,
+    `codex: progress ${short}`,
+    `codex: progress ${short} -5%`,
+    `codex: progress ${short} 150% too far`);
+  let r = wb.syncOnce(s, dir);
+  assert.deepEqual(r.results.map((x) => x.ok), [false, false, false, false]);
+  for (const x of r.results.slice(0, 3)) assert.match(x.message, /write "progress <task> 40%/);
+  assert.match(r.results[3].message, /0\.\.100/);
+  const unchanged = s.getTask(task.id);
+  assert.equal(unchanged.progress, before.progress);
+  assert.equal(unchanged.progressNote, before.progressNote);
+  assert.deepEqual(unchanged.metrics, before.metrics);
+
+  add(`codex: progress ${short} 40% retry works | tokens=1 cost=0.01`,
+    `codex: progress ${short} | loss=0.41`);
+  r = wb.syncOnce(s, dir);
+  assert.deepEqual(r.results.map((x) => x.ok), [true, true]);
+  const after = s.getTask(task.id);
+  assert.equal(after.progress, 40);
+  assert.equal(after.progressNote, 'retry works');
+  assert.equal(after.usage.tokens, 1);
+  assert.equal(after.usage.costUsd, 0.01);
+  assert.equal(after.metrics.loss.at(-1).v, 0.41);
+});
+
 test('workboard: parsing helpers', () => {
   assert.deepEqual(wb.parseProgress('40% epoch 4 | loss=0.5 cost=0.1 tokens=20'), { progress: 40, message: 'epoch 4', usage: { costUsd: 0.1, tokens: 20 }, metrics: { loss: 0.5 } });
   assert.throws(() => wb.parseProgress('10% | loss=abc'), /key=number/);

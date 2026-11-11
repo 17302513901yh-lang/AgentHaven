@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **A `progress` line without a percentage is refused**: `WORKBOARD.md` now answers ✗ with the documented syntax for a line that has neither a valid `N%` nor any `| key=value` metrics, instead of silently recording nothing with a ✓ and a "—%" result. A metrics-only line stays valid. (#44)
+
 ## 0.8.0
 
 Guard catches more, the terminal commands ask before they change anything, and a setup guide for MCP clients. [Full notes](docs/releases/v0.8.0.md)
