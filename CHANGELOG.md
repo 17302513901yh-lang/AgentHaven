@@ -5,7 +5,9 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
-- **Guard fully redacts quoted passwords and passphrases**, including spaces and escaped quote characters, while preserving the surrounding quotes. (#63)
+- **Guard removes the token in `Authorization` headers** (`Bearer`, `Token` and `Basic`, in any letter case, also inside `curl -H '...'`) before anything is stored, keeping the header name and scheme. Values of 16 or more characters that another rule already removed are not reported twice, and ordinary prose about Bearer tokens is left alone. Thanks to @jdotc1! (#41, #65)
+
+- **Guard fully redacts quoted passwords and passphrases**, including spaces and escaped quote characters, while preserving the surrounding quotes. Thanks to @jdotc1! (#63, #64)
 
 - **Guard removes Shopify access tokens** (`shpat_`, `shpca_`, `shppa_` and `shpss_` followed by 32 hex characters) before anything is stored, next to the other provider keys. Thanks to @jdotc1! (#40, #59)
 
