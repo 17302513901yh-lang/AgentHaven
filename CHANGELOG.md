@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard redacts quoted JSON/YAML secret assignments** such as `"password": "..."` and `"api_key": "..."`, preserving the key names and surrounding quotes while keeping short values and already-redacted placeholders unchanged. (#45)
+
 ## 0.8.1
 
 A small fix release: a mistyped status filter is now an error, and Guard removes DigitalOcean tokens. [Full notes](docs/releases/v0.8.1.md)
