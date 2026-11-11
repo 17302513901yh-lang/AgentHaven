@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **An unknown status filter is an error, not an empty board**: `listTasks` now refuses a status outside `todo, doing, blocked, review, done` with the same message as `updateTask`, so a typo over the HTTP API answers 400 and over MCP returns an error instead of looking like there is nothing to do. (#46)
+
 ## 0.8.0
 
 Guard catches more, the terminal commands ask before they change anything, and a setup guide for MCP clients. [Full notes](docs/releases/v0.8.0.md)
