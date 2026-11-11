@@ -108,6 +108,37 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: redacts Authorization header credentials without false positives', () => {
+  const credential = 'a1B2c3D4e5F6g7H8i9J0';
+  for (const [input, expected] of [
+    [`Authorization: Bearer ${credential}`, 'Authorization: Bearer [authorization token removed]'],
+    [`authorization: token ${credential}`, 'authorization: token [authorization token removed]'],
+    [`-H 'Authorization: Basic ${credential}=' https://api.example.com`, "-H 'Authorization: Basic [authorization token removed]' https://api.example.com"],
+    [`curl -H "Authorization: Bearer ${credential}" https://api.example.com`, 'curl -H "Authorization: Bearer [authorization token removed]" https://api.example.com'],
+  ]) {
+    const scanned = inspect(input);
+    assert.equal(scanned.text, expected, input);
+    assert.deepEqual(scanned.secrets, ['authorization token'], input);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const ordinary of [
+    'Use a Bearer token in the Authorization header',
+    'Authorization: Bearer short',
+    'Authorization: Token abcdefghijklmno', // one character below the detection threshold
+    'Authorization: Bearer \nnext line',
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+
+  const providerToken = 'sk-proj-' + 'Z'.repeat(32);
+  const provider = inspect(`Authorization: Bearer ${providerToken}`);
+  assert.equal(provider.text, 'Authorization: Bearer [OpenAI key removed]');
+  assert.deepEqual(provider.secrets, ['OpenAI key'], 'already-detected provider token must not be reported twice');
+
+  const longInput = 'Authorization: Bearer '.repeat(5000);
+  const started = process.hrtime.bigint();
+  inspect(longInput);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'header scan exceeded 500 ms');
+});
+
 test('guard: DigitalOcean tokens are removed without catching lookalikes', () => {
   for (const prefix of ['dop', 'doo', 'dor']) {
     const token = `${prefix}_v1_` + 'a1b2c3d4'.repeat(8);
