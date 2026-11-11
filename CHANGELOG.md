@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard removes Shopify access tokens** (`shpat_`, `shpca_`, `shppa_` and `shpss_` followed by 32 hex characters) before anything is stored, next to the other provider keys. Thanks to @jdotc1! (#40, #59)
+
 ## 0.8.1
 
 A small fix release: a mistyped status filter is now an error, and Guard removes DigitalOcean tokens. [Full notes](docs/releases/v0.8.1.md)
