@@ -22,6 +22,7 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
     'Replicate token': 'r8_abcdefghijklmnopqrstuvwxyz0123456789AB',
     'Discord bot token': `Bot ${fakeDiscordToken()}`,
     'GitHub token': 'ghp_abcdefghijklmnopqrstuvwxyz0123456789',
+    'Shopify token': 'shpat_' + 'a1b2c3d4'.repeat(4),
     'AWS access key': 'AKIAIOSFODNN7EXAMPLE',
     'Google API key': 'AIzaSyA1234567890abcdefghijklmnopqrstuv',
     'Slack token': 'xoxb-1234567890-abcdefghij',
@@ -84,6 +85,29 @@ test('guard: redacts values after quoted JSON and YAML secret keys', () => {
     assert.equal(scanned.text, ordinary);
     assert.deepEqual(scanned.secrets, []);
   }
+});
+
+test('guard: Shopify tokens are removed without catching lookalikes', () => {
+  for (const prefix of ['shpat', 'shpca', 'shppa', 'shpss']) {
+    const token = `${prefix}_` + 'a1B2c3D4'.repeat(4);
+    for (const suffix of ['', ' done', '\nnext']) {
+      const scanned = inspect(`Deploy using ${token}${suffix}`);
+      assert.deepEqual(scanned.secrets, ['Shopify token']);
+      assert.equal(scanned.text, `Deploy using [Shopify token removed]${suffix}`);
+    }
+  }
+
+  const token = 'shpat_' + 'a1b2c3d4'.repeat(4);
+  for (const ordinary of [
+    'Use the shpat_ prefix for Shopify tokens',
+    'shpat_' + 'a'.repeat(31),
+    'shpca_' + 'b'.repeat(33),
+    'shppa_' + 'g'.repeat(32),
+    'shpss_' + 'c'.repeat(32) + '_extra',
+    `prefix${token}`,
+    `_${token}`,
+    `${token}f`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
 test('guard: DigitalOcean tokens are removed without catching lookalikes', () => {
