@@ -60,6 +60,10 @@ test('guard: redacts values after quoted JSON and YAML secret keys', () => {
     ['{"client_secret": "Zx9Qw8Er7Ty6Ui5"}', '{"client_secret": "[secret removed]"}'],
     ['"DB_PASSWORD": "s3cr3t-value"', '"DB_PASSWORD": "[secret removed]"'],
     ["'access_token': 'synthetic-token-value'", "'access_token': '[secret removed]'"],
+    ['{"password": "hunter2\\"hunter2"}', '{"password": "[secret removed]"}'],
+    ["'client_secret': 'synthetic\\'token-value'", "'client_secret': '[secret removed]'"],
+    ["'password': 'synthetic''token-value'", "'password': '[secret removed]'"],
+    ['{"api_key": "fake value with spaces, \\"quotes\\" and punctuation;"}', '{"api_key": "[secret removed]"}'],
   ]) {
     const scanned = inspect(input);
     assert.equal(scanned.text, expected, input);
@@ -71,7 +75,10 @@ test('guard: redacts values after quoted JSON and YAML secret keys', () => {
     '{"passwordHint": "your first pet"}',
     '{"name": "build-tools"}',
     '{"password": "short"}',
+    '{"password": "ab\\"c"}',
+    "'password': 'ab''c'",
     '{"password": "[secret removed]"}',
+    '{"passwordHint": "ordinary\\"text"}',
   ]) {
     const scanned = inspect(ordinary);
     assert.equal(scanned.text, ordinary);

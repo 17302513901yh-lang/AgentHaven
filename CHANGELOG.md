@@ -5,7 +5,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
-- **Guard redacts quoted JSON/YAML secret assignments** such as `"password": "..."` and `"api_key": "..."`, preserving the key names and surrounding quotes while keeping short values and already-redacted placeholders unchanged. (#45)
+- **Guard redacts quoted JSON/YAML secret assignments** such as `"password": "..."` and `"api_key": "..."`, preserving key names and quotes even when values contain escaped quotes or spaces, while leaving short values and already-redacted placeholders unchanged. (#45)
 
 ## 0.8.1
 
