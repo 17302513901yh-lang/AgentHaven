@@ -51,6 +51,30 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: DigitalOcean tokens are removed without catching lookalikes', () => {
+  for (const prefix of ['dop', 'doo', 'dor']) {
+    const token = `${prefix}_v1_` + 'a1b2c3d4'.repeat(8);
+    for (const suffix of ['', ' done', '\nnext']) {
+      const scanned = inspect(`Deploy using ${token}${suffix}`);
+      assert.deepEqual(scanned.secrets, ['DigitalOcean token']);
+      assert.equal(scanned.text, `Deploy using [DigitalOcean token removed]${suffix}`);
+    }
+  }
+
+  const token = 'dop_v1_' + 'a1b2c3d4'.repeat(8);
+  for (const ordinary of [
+    'Use a DigitalOcean personal access token',
+    'dop_v1_' + 'a'.repeat(63),
+    'doo_v1_' + 'b'.repeat(65),
+    'dor_v2_' + 'c'.repeat(64),
+    `not${token}`,
+    `var_${token}`,
+    `${token}f`,
+    `${token}_suffix`,
+    'dop_v1_' + 'g'.repeat(64),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
 test('guard: PyPI upload tokens are removed without flagging package references', () => {
   const fakeToken = 'pypi-' + 'Ab3_'.repeat(22);
   for (const suffix of ['', ' done', '\nnext']) {
