@@ -5,6 +5,10 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+## 0.8.1
+
+A small fix release: a mistyped status filter is now an error, and Guard removes DigitalOcean tokens. [Full notes](docs/releases/v0.8.1.md)
+
 - **An unknown status filter is an error, not an empty board**: `listTasks` now refuses a status outside `todo, doing, blocked, review, done` with the same message as `updateTask`, so a typo over the HTTP API answers 400 and over MCP returns an error instead of looking like there is nothing to do. Thanks to @17302513901yh-lang! (#46, #54)
 - **Guard removes DigitalOcean tokens** (`dop_v1_`, `doo_v1_` and `dor_v1_` followed by 64 hex characters) before anything is stored, next to the other provider keys. Thanks to @jdotc1 for the careful pattern and tests! (#39, #56)
 
