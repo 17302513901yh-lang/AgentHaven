@@ -52,6 +52,29 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: Shopify tokens are removed without catching lookalikes', () => {
+  for (const prefix of ['shpat', 'shpca', 'shppa', 'shpss']) {
+    const token = `${prefix}_` + 'a1B2c3D4'.repeat(4);
+    for (const suffix of ['', ' done', '\nnext']) {
+      const scanned = inspect(`Deploy using ${token}${suffix}`);
+      assert.deepEqual(scanned.secrets, ['Shopify token']);
+      assert.equal(scanned.text, `Deploy using [Shopify token removed]${suffix}`);
+    }
+  }
+
+  const token = 'shpat_' + 'a1b2c3d4'.repeat(4);
+  for (const ordinary of [
+    'Use the shpat_ prefix for Shopify tokens',
+    'shpat_' + 'a'.repeat(31),
+    'shpca_' + 'b'.repeat(33),
+    'shppa_' + 'g'.repeat(32),
+    'shpss_' + 'c'.repeat(32) + '_extra',
+    `prefix${token}`,
+    `_${token}`,
+    `${token}f`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
 test('guard: redacts Authorization header credentials without false positives', () => {
   const credential = 'a1B2c3D4e5F6g7H8i9J0';
   for (const [input, expected] of [
@@ -81,29 +104,6 @@ test('guard: redacts Authorization header credentials without false positives', 
   const started = process.hrtime.bigint();
   inspect(longInput);
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'header scan exceeded 500 ms');
-});
-
-test('guard: Shopify tokens are removed without catching lookalikes', () => {
-  for (const prefix of ['shpat', 'shpca', 'shppa', 'shpss']) {
-    const token = `${prefix}_` + 'a1B2c3D4'.repeat(4);
-    for (const suffix of ['', ' done', '\nnext']) {
-      const scanned = inspect(`Deploy using ${token}${suffix}`);
-      assert.deepEqual(scanned.secrets, ['Shopify token']);
-      assert.equal(scanned.text, `Deploy using [Shopify token removed]${suffix}`);
-    }
-  }
-
-  const token = 'shpat_' + 'a1b2c3d4'.repeat(4);
-  for (const ordinary of [
-    'Use the shpat_ prefix for Shopify tokens',
-    'shpat_' + 'a'.repeat(31),
-    'shpca_' + 'b'.repeat(33),
-    'shppa_' + 'g'.repeat(32),
-    'shpss_' + 'c'.repeat(32) + '_extra',
-    `prefix${token}`,
-    `_${token}`,
-    `${token}f`,
-  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
 test('guard: DigitalOcean tokens are removed without catching lookalikes', () => {
