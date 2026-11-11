@@ -52,31 +52,6 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
-test('guard: fully redacts quoted passphrases without changing unquoted assignments', () => {
-  for (const [input, expected] of [
-    ['DB_PASSWORD="correct horse battery staple"', 'DB_PASSWORD="[secret removed]"'],
-    ["password: 'hunter2 hunter2'", "password: '[secret removed]'"],
-    ['api_key=`synthetic value with spaces`', 'api_key=`[secret removed]`'],
-    ['{"password": "correct horse battery staple"}', '{"password": "[secret removed]"}'],
-    ['password="hunter2\\" horse"', 'password="[secret removed]"'],
-    ["password='hunter2\\' horse'", "password='[secret removed]'"],
-    ['password=`hunter2\\` horse`', 'password=`[secret removed]`'],
-    ['password=hunter2 horse', 'password=[secret removed] horse'],
-  ]) {
-    const result = inspect(input);
-    assert.equal(result.text, expected, input);
-    assert.deepEqual(result.secrets, ['password']);
-    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
-  }
-  for (const harmless of ['password=""', "password=''", 'password=``', 'password="short"']) {
-    assert.equal(inspect(harmless).text, harmless);
-  }
-  const longInput = 'password="' + '\\\\"'.repeat(20000); // >100 KB without a closing quote.
-  const started = process.hrtime.bigint();
-  inspect(longInput);
-  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'quoted-secret scan exceeded 500 ms');
-});
-
 test('guard: Shopify tokens are removed without catching lookalikes', () => {
   for (const prefix of ['shpat', 'shpca', 'shppa', 'shpss']) {
     const token = `${prefix}_` + 'a1B2c3D4'.repeat(4);
@@ -122,6 +97,31 @@ test('guard: DigitalOcean tokens are removed without catching lookalikes', () =>
     `${token}_suffix`,
     'dop_v1_' + 'g'.repeat(64),
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
+test('guard: fully redacts quoted passphrases without changing unquoted assignments', () => {
+  for (const [input, expected] of [
+    ['DB_PASSWORD="correct horse battery staple"', 'DB_PASSWORD="[secret removed]"'],
+    ["password: 'hunter2 hunter2'", "password: '[secret removed]'"],
+    ['api_key=`synthetic value with spaces`', 'api_key=`[secret removed]`'],
+    ['{"password": "correct horse battery staple"}', '{"password": "[secret removed]"}'],
+    ['password="hunter2\\" horse"', 'password="[secret removed]"'],
+    ["password='hunter2\\' horse'", "password='[secret removed]'"],
+    ['password=`hunter2\\` horse`', 'password=`[secret removed]`'],
+    ['password=hunter2 horse', 'password=[secret removed] horse'],
+  ]) {
+    const result = inspect(input);
+    assert.equal(result.text, expected, input);
+    assert.deepEqual(result.secrets, ['password']);
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const harmless of ['password=""', "password=''", 'password=``', 'password="short"']) {
+    assert.equal(inspect(harmless).text, harmless);
+  }
+  const longInput = 'password="' + '\\\\"'.repeat(20000); // >100 KB without a closing quote.
+  const started = process.hrtime.bigint();
+  inspect(longInput);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'quoted-secret scan exceeded 500 ms');
 });
 
 test('guard: PyPI upload tokens are removed without flagging package references', () => {
