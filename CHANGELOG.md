@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard fully redacts quoted passwords and passphrases**, including spaces and escaped quote characters, while preserving the surrounding quotes. (#63)
+
 - **Guard removes Shopify access tokens** (`shpat_`, `shpca_`, `shppa_` and `shpss_` followed by 32 hex characters) before anything is stored, next to the other provider keys. Thanks to @jdotc1! (#40, #59)
 
 ## 0.8.1
