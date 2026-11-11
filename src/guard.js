@@ -45,6 +45,9 @@ const SECRET_RULES = [
   // PyPI macaroons use pypi- followed by at least 85 base64url characters.
   ['PyPI token', /(?<![A-Za-z0-9_-])pypi-[A-Za-z0-9_-]{85,}(?![A-Za-z0-9_-])/g],
   ['JWT', /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g],
+  // Redact the value, not the closing quote; the normal password replacement
+  // then preserves both delimiters even for spaces and escaped quotes.
+  ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*(["'`]))(?!\[secret removed\]\2)(?:\\.|(?!\2)[^\\\r\n]){6,}(?=\2)/gi],
   ['connection string password', /\b([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s@/]{3,})(@)/gi],
   // Run after provider patterns to avoid double-reporting recognized tokens.
   ['authorization token', /\b(Authorization[ \t]*:[ \t]*(?:Bearer|Token|Basic)[ \t]+)([A-Za-z0-9._~+/=-]{16,})(?![A-Za-z0-9._~+/=-])/gi],

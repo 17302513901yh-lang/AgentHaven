@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard fully redacts quoted passwords and passphrases**, including spaces and escaped quote characters, while preserving the surrounding quotes. (#63)
+
 - **Guard removes Shopify access tokens** (`shpat_`, `shpca_`, `shppa_` and `shpss_` followed by 32 hex characters) before anything is stored, next to the other provider keys. Thanks to @jdotc1! (#40, #59)
 
 - **Guard redacts quoted JSON/YAML secret assignments** such as `"password": "..."` and `"api_key": "..."`, preserving the key names and surrounding quotes while keeping short values and already-redacted placeholders unchanged. Thanks to @jdotc1! (#45, #60)
