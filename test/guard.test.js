@@ -52,6 +52,39 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: redacts values after quoted JSON and YAML secret keys', () => {
+  for (const [input, expected] of [
+    ['password: hunter2hunter2', 'password: [secret removed]'],
+    ['DB_PASSWORD=hunter2hunter2', 'DB_PASSWORD=[secret removed]'],
+    ['{"password": "hunter2hunter2"}', '{"password": "[secret removed]"}'],
+    ['{"api_key":"abcd1234efgh5678"}', '{"api_key":"[secret removed]"}'],
+    ['{"client_secret": "Zx9Qw8Er7Ty6Ui5"}', '{"client_secret": "[secret removed]"}'],
+    ['"DB_PASSWORD": "s3cr3t-value"', '"DB_PASSWORD": "[secret removed]"'],
+    ["'access_token': 'synthetic-token-value'", "'access_token': '[secret removed]'"],
+    ['{"password": "hunt\\"er2hunter2"}', '{"password": "[secret removed]"}'],
+    ['{"password": "hunter2\\"hunter2"}', '{"password": "[secret removed]"}'],
+    ["'client_secret': 'synthetic\\'token-value'", "'client_secret': '[secret removed]'"],
+  ]) {
+    const scanned = inspect(input);
+    assert.equal(scanned.text, expected, input);
+    assert.deepEqual(scanned.secrets, ['password'], input);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    '{"passwordHint": "your first pet"}',
+    '{"name": "build-tools"}',
+    '{"password": "short"}',
+    '{"password": "ab\\"c"}',
+    '{"password": "[secret removed]"}',
+    '{"passwordHint": "ordinary\\"text"}',
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.equal(scanned.text, ordinary);
+    assert.deepEqual(scanned.secrets, []);
+  }
+});
+
 test('guard: Shopify tokens are removed without catching lookalikes', () => {
   for (const prefix of ['shpat', 'shpca', 'shppa', 'shpss']) {
     const token = `${prefix}_` + 'a1B2c3D4'.repeat(4);
