@@ -314,8 +314,15 @@ function applyCommand(store, raw) {
       }
       case 'claim': { const t = store.claimTask(task(), { actor }); return { ok: true, message: `claimed "${t.title}" until ${short(t.leaseUntil)}${lessonHint(store, t, actor)}` }; }
       case 'progress': {
+        const id = task();
         const p = parseProgress(after);
-        const r = store.reportProgress(task(), { actor, ...p });
+        // A line with neither a percentage nor any | key=value metrics used to be
+        // accepted with a ✓ and a "—%" result while recording nothing. Refuse it
+        // with the documented syntax instead; a metrics-only report stays valid.
+        if (p.progress === undefined && !Object.keys(p.usage).length && !Object.keys(p.metrics).length) {
+          throw new Error('write "progress <task> 40% [message] | tokens=12000 cost=0.03"');
+        }
+        const r = store.reportProgress(id, { actor, ...p });
         return { ok: true, message: `${r.progress ?? '—'}%${r.status === 'blocked' ? ` — BLOCKED: ${r.blockedReason}` : ''}` };
       }
       case 'check': case 'uncheck': {

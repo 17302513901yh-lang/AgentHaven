@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **A `progress` line without a percentage is refused**: `WORKBOARD.md` now answers ✗ with the documented syntax for a line that has neither a valid `N%` nor any `| key=value` metrics, instead of silently recording nothing with a ✓ and a "—%" result. A metrics-only line stays valid. Thanks to @17302513901yh-lang! (#44, #55)
+
 ## 0.8.2
 
 Guard removes more secrets: Shopify tokens, values after quoted JSON/YAML keys, complete quoted passphrases and `Authorization` header tokens. [Full notes](docs/releases/v0.8.2.md)
