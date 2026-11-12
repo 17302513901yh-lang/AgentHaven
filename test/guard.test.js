@@ -22,6 +22,7 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
     'Replicate token': 'r8_abcdefghijklmnopqrstuvwxyz0123456789AB',
     'Discord bot token': `Bot ${fakeDiscordToken()}`,
     'GitHub token': 'ghp_abcdefghijklmnopqrstuvwxyz0123456789',
+    'Shopify token': 'shpat_' + 'a1b2c3d4'.repeat(4),
     'AWS access key': 'AKIAIOSFODNN7EXAMPLE',
     'Google API key': 'AIzaSyA1234567890abcdefghijklmnopqrstuv',
     'Slack token': 'xoxb-1234567890-abcdefghij',
@@ -49,6 +50,142 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
     `SG.${'a'.repeat(21)}.${'B'.repeat(43)}`,
     `SG.${'a'.repeat(22)}.${'B'.repeat(44)}`,
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
+test('guard: redacts values after quoted JSON and YAML secret keys', () => {
+  for (const [input, expected] of [
+    ['password: hunter2hunter2', 'password: [secret removed]'],
+    ['DB_PASSWORD=hunter2hunter2', 'DB_PASSWORD=[secret removed]'],
+    ['{"password": "hunter2hunter2"}', '{"password": "[secret removed]"}'],
+    ['{"api_key":"abcd1234efgh5678"}', '{"api_key":"[secret removed]"}'],
+    ['{"client_secret": "Zx9Qw8Er7Ty6Ui5"}', '{"client_secret": "[secret removed]"}'],
+    ['"DB_PASSWORD": "s3cr3t-value"', '"DB_PASSWORD": "[secret removed]"'],
+    ["'access_token': 'synthetic-token-value'", "'access_token': '[secret removed]'"],
+    ['{"password": "hunt\\"er2hunter2"}', '{"password": "[secret removed]"}'],
+    ['{"password": "hunter2\\"hunter2"}', '{"password": "[secret removed]"}'],
+    ["'client_secret': 'synthetic\\'token-value'", "'client_secret': '[secret removed]'"],
+  ]) {
+    const scanned = inspect(input);
+    assert.equal(scanned.text, expected, input);
+    assert.deepEqual(scanned.secrets, ['password'], input);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    '{"passwordHint": "your first pet"}',
+    '{"name": "build-tools"}',
+    '{"password": "short"}',
+    '{"password": "ab\\"c"}',
+    '{"password": "[secret removed]"}',
+    '{"passwordHint": "ordinary\\"text"}',
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.equal(scanned.text, ordinary);
+    assert.deepEqual(scanned.secrets, []);
+  }
+});
+
+test('guard: Shopify tokens are removed without catching lookalikes', () => {
+  for (const prefix of ['shpat', 'shpca', 'shppa', 'shpss']) {
+    const token = `${prefix}_` + 'a1B2c3D4'.repeat(4);
+    for (const suffix of ['', ' done', '\nnext']) {
+      const scanned = inspect(`Deploy using ${token}${suffix}`);
+      assert.deepEqual(scanned.secrets, ['Shopify token']);
+      assert.equal(scanned.text, `Deploy using [Shopify token removed]${suffix}`);
+    }
+  }
+
+  const token = 'shpat_' + 'a1b2c3d4'.repeat(4);
+  for (const ordinary of [
+    'Use the shpat_ prefix for Shopify tokens',
+    'shpat_' + 'a'.repeat(31),
+    'shpca_' + 'b'.repeat(33),
+    'shppa_' + 'g'.repeat(32),
+    'shpss_' + 'c'.repeat(32) + '_extra',
+    `prefix${token}`,
+    `_${token}`,
+    `${token}f`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
+test('guard: redacts Authorization header credentials without false positives', () => {
+  const credential = 'a1B2c3D4e5F6g7H8i9J0';
+  for (const [input, expected] of [
+    [`Authorization: Bearer ${credential}`, 'Authorization: Bearer [authorization token removed]'],
+    [`authorization: token ${credential}`, 'authorization: token [authorization token removed]'],
+    [`-H 'Authorization: Basic ${credential}=' https://api.example.com`, "-H 'Authorization: Basic [authorization token removed]' https://api.example.com"],
+    [`curl -H "Authorization: Bearer ${credential}" https://api.example.com`, 'curl -H "Authorization: Bearer [authorization token removed]" https://api.example.com'],
+  ]) {
+    const scanned = inspect(input);
+    assert.equal(scanned.text, expected, input);
+    assert.deepEqual(scanned.secrets, ['authorization token'], input);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const ordinary of [
+    'Use a Bearer token in the Authorization header',
+    'Authorization: Bearer short',
+    'Authorization: Token abcdefghijklmno', // one character below the detection threshold
+    'Authorization: Bearer \nnext line',
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+
+  const providerToken = 'sk-proj-' + 'Z'.repeat(32);
+  const provider = inspect(`Authorization: Bearer ${providerToken}`);
+  assert.equal(provider.text, 'Authorization: Bearer [OpenAI key removed]');
+  assert.deepEqual(provider.secrets, ['OpenAI key'], 'already-detected provider token must not be reported twice');
+
+  const longInput = 'Authorization: Bearer '.repeat(5000);
+  const started = process.hrtime.bigint();
+  inspect(longInput);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'header scan exceeded 500 ms');
+});
+
+test('guard: DigitalOcean tokens are removed without catching lookalikes', () => {
+  for (const prefix of ['dop', 'doo', 'dor']) {
+    const token = `${prefix}_v1_` + 'a1b2c3d4'.repeat(8);
+    for (const suffix of ['', ' done', '\nnext']) {
+      const scanned = inspect(`Deploy using ${token}${suffix}`);
+      assert.deepEqual(scanned.secrets, ['DigitalOcean token']);
+      assert.equal(scanned.text, `Deploy using [DigitalOcean token removed]${suffix}`);
+    }
+  }
+
+  const token = 'dop_v1_' + 'a1b2c3d4'.repeat(8);
+  for (const ordinary of [
+    'Use a DigitalOcean personal access token',
+    'dop_v1_' + 'a'.repeat(63),
+    'doo_v1_' + 'b'.repeat(65),
+    'dor_v2_' + 'c'.repeat(64),
+    `not${token}`,
+    `var_${token}`,
+    `${token}f`,
+    `${token}_suffix`,
+    'dop_v1_' + 'g'.repeat(64),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
+test('guard: fully redacts quoted passphrases without changing unquoted assignments', () => {
+  for (const [input, expected] of [
+    ['DB_PASSWORD="correct horse battery staple"', 'DB_PASSWORD="[secret removed]"'],
+    ["password: 'hunter2 hunter2'", "password: '[secret removed]'"],
+    ['api_key=`synthetic value with spaces`', 'api_key=`[secret removed]`'],
+    ['{"password": "correct horse battery staple"}', '{"password": "[secret removed]"}'],
+    ['password="hunter2\\" horse"', 'password="[secret removed]"'],
+    ["password='hunter2\\' horse'", "password='[secret removed]'"],
+    ['password=`hunter2\\` horse`', 'password=`[secret removed]`'],
+    ['password=hunter2 horse', 'password=[secret removed] horse'],
+  ]) {
+    const result = inspect(input);
+    assert.equal(result.text, expected, input);
+    assert.deepEqual(result.secrets, ['password']);
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const harmless of ['password=""', "password=''", 'password=``', 'password="short"']) {
+    assert.equal(inspect(harmless).text, harmless);
+  }
+  const longInput = 'password="' + '\\\\"'.repeat(20000); // >100 KB without a closing quote.
+  const started = process.hrtime.bigint();
+  inspect(longInput);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'quoted-secret scan exceeded 500 ms');
 });
 
 test('guard: PyPI upload tokens are removed without flagging package references', () => {

@@ -133,6 +133,26 @@ test('paths normalise and delete needs a version', () => {
   assert.deepEqual(s.getTask(dep.id).dependsOn, []);
 });
 
+test('listTasks: an unknown status is an error, not an empty board', async () => {
+  const s = tmpStore();
+  s.createTask({ title: 'a', actor: 'you' });
+  assert.equal(s.listTasks().length, 1);
+  assert.equal(s.listTasks({ status: '' }).length, 1);
+  assert.equal(s.listTasks({ status: 'todo' }).length, 1);
+  assert.equal(s.listTasks({ status: 'doing' }).length, 0);
+  assert.throws(() => s.listTasks({ status: 'In Progress' }), /status must be one of todo, doing, blocked, review, done/);
+  assert.throws(() => s.listTasks({ status: 'bogus' }), /status must be one of/);
+  const { server, url } = await start({ store: s });
+  try {
+    const bad = await fetch(`${url}api/tasks?status=In%20Progress`);
+    assert.equal(bad.status, 400);
+    assert.match((await bad.json()).error, /status must be one of todo, doing, blocked, review, done/);
+    assert.equal((await fetch(`${url}api/tasks?status=todo`)).status, 200);
+  } finally {
+    server.close();
+  }
+});
+
 test('schema 1 workspace files still load', () => {
   const dir = tmpDir();
   fs.writeFileSync(path.join(dir, 'default.json'), `﻿${JSON.stringify({ schema: 1, tasks: [{ id: 'task_aaaaaaaaaaaa', title: 'Old', description: '', status: 'todo', assignee: null, files: [], createdBy: 'x', createdAt: '2026-01-01T00:00:00.000Z', updatedAt: '2026-01-01T00:00:00.000Z', version: 1 }], notes: [], log: [{ id: 'evt_1', at: '2026-01-01T00:00:00.000Z', actor: 'x', action: 'task.created' }] })}`);

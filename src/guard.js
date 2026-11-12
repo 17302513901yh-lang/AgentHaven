@@ -34,6 +34,8 @@ const SECRET_RULES = [
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
+  ['DigitalOcean token', /(?<![A-Za-z0-9_])(?:dop|doo|dor)_v1_[0-9a-f]{64}(?![A-Za-z0-9_])/g],
+  ['Shopify token', /(?<![A-Za-z0-9_])(?:shpat|shpca|shppa|shpss)_[0-9a-fA-F]{32}(?![A-Za-z0-9_])/g],
   ['AWS access key', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
@@ -43,9 +45,14 @@ const SECRET_RULES = [
   // PyPI macaroons use pypi- followed by at least 85 base64url characters.
   ['PyPI token', /(?<![A-Za-z0-9_-])pypi-[A-Za-z0-9_-]{85,}(?![A-Za-z0-9_-])/g],
   ['JWT', /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g],
+  // Redact the value, not the closing quote; the normal password replacement
+  // then preserves both delimiters even for spaces and escaped quotes.
+  ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*(["'`]))(?!\[secret removed\]\2)(?:\\.|(?!\2)[^\\\r\n]){6,}(?=\2)/gi],
   ['connection string password', /\b([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s@/]{3,})(@)/gi],
+  // Run after provider patterns to avoid double-reporting recognized tokens.
+  ['authorization token', /\b(Authorization[ \t]*:[ \t]*(?:Bearer|Token|Basic)[ \t]+)([A-Za-z0-9._~+/=-]{16,})(?![A-Za-z0-9._~+/=-])/gi],
   // Also inside names like DB_PASSWORD or OPENAI_API_KEY (an underscore is no word boundary).
-  ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)\s*[:=]\s*["']?)((?!\[)[^\s"'`,;]{6,})/gi],
+  ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*["']?)((?!\[)(?:\\.|[^\s"'`,;\\]){6,})/gi],
 ];
 
 // Zero-width and bidi controls, and the Unicode "tag" block used to hide text from people.
@@ -98,6 +105,7 @@ function inspect(input) {
       // Keep the key name or URL around a password, replace only the secret itself.
       if (kind === 'password') return `${m[1]}[secret removed]`;
       if (kind === 'connection string password') return `${m[1]}[secret removed]${m[3]}`;
+      if (kind === 'authorization token') return `${m[1]}[authorization token removed]`;
       return `[${kind} removed]`;
     });
   }

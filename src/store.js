@@ -580,6 +580,9 @@ class Store {
   }
 
   listTasks({ status, assignee, full = false } = {}) {
+    if (status !== undefined && status !== null && status !== '' && !STATUSES.includes(status)) {
+      throw new ValidationError(`status must be one of ${STATUSES.join(', ')}`);
+    }
     const data = this.fresh();
     return data.tasks
       .filter((t) => (!status || t.status === status) && (!assignee || t.assignee === assignee))

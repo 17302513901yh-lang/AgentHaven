@@ -5,7 +5,23 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
-- **A `progress` line without a percentage is refused**: `WORKBOARD.md` now answers ✗ with the documented syntax for a line that has neither a valid `N%` nor any `| key=value` metrics, instead of silently recording nothing with a ✓ and a "—%" result. A metrics-only line stays valid. (#44)
+- **A `progress` line without a percentage is refused**: `WORKBOARD.md` now answers ✗ with the documented syntax for a line that has neither a valid `N%` nor any `| key=value` metrics, instead of silently recording nothing with a ✓ and a "—%" result. A metrics-only line stays valid. Thanks to @17302513901yh-lang! (#44, #55)
+
+## 0.8.2
+
+Guard removes more secrets: Shopify tokens, values after quoted JSON/YAML keys, complete quoted passphrases and `Authorization` header tokens. [Full notes](docs/releases/v0.8.2.md)
+
+- **Guard removes the token in `Authorization` headers** (`Bearer`, `Token` and `Basic`, in any letter case, also inside `curl -H '...'`) before anything is stored, keeping the header name and scheme. Values of 16 or more characters that another rule already removed are not reported twice, and ordinary prose about Bearer tokens is left alone. Thanks to @jdotc1! (#41, #65)
+- **Guard fully redacts quoted passwords and passphrases**, including spaces and escaped quote characters, while preserving the surrounding quotes. Thanks to @jdotc1! (#63, #64)
+- **Guard removes Shopify access tokens** (`shpat_`, `shpca_`, `shppa_` and `shpss_` followed by 32 hex characters) before anything is stored, next to the other provider keys. Thanks to @jdotc1! (#40, #59)
+- **Guard redacts quoted JSON/YAML secret assignments** such as `"password": "..."` and `"api_key": "..."`, preserving the key names and surrounding quotes, also when the value contains escaped quotes, while keeping short values and already-redacted placeholders unchanged. Thanks to @jdotc1! (#45, #60)
+
+## 0.8.1
+
+A small fix release: a mistyped status filter is now an error, and Guard removes DigitalOcean tokens. [Full notes](docs/releases/v0.8.1.md)
+
+- **An unknown status filter is an error, not an empty board**: `listTasks` now refuses a status outside `todo, doing, blocked, review, done` with the same message as `updateTask`, so a typo over the HTTP API answers 400 and over MCP returns an error instead of looking like there is nothing to do. Thanks to @17302513901yh-lang! (#46, #54)
+- **Guard removes DigitalOcean tokens** (`dop_v1_`, `doo_v1_` and `dor_v1_` followed by 64 hex characters) before anything is stored, next to the other provider keys. Thanks to @jdotc1 for the careful pattern and tests! (#39, #56)
 
 ## 0.8.0
 
