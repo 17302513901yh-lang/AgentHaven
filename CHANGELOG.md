@@ -5,6 +5,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **`PATCH /api/mode` no longer flips agents-only mode by accident**: `setMode` used `Boolean(agentsOnly)`, so `{}` and a misspelled field turned it off and the string `"false"` turned it on, all with a 200. Only the real booleans `true` / `false` are accepted now; anything else is a 400 (`agentsOnly must be true or false`) and leaves the mode unchanged. Thanks to @17302513901yh-lang! (#73)
 - **A `progress` line without a percentage is refused**: `WORKBOARD.md` now answers ✗ with the documented syntax for a line that has neither a valid `N%` nor any `| key=value` metrics, instead of silently recording nothing with a ✓ and a "—%" result. A metrics-only line stays valid. Thanks to @17302513901yh-lang! (#44, #55)
 
 ## 0.8.2
