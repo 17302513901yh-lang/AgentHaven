@@ -60,6 +60,9 @@ const SECRET_RULES = [
 
 // Zero-width and bidi controls, and the Unicode "tag" block used to hide text from people.
 const INVISIBLE = /[\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]|[\u{E0000}-\u{E007F}]/gu;
+// Preserve these characters in stored text (notably emoji/script joiners), but
+// disregard them when deciding whether the text contains an injected command.
+const INJECTION_INVISIBLE = /[\u00AD\u034F\u180E\u200D]/gu;
 
 // Keep the original same-line override rule. A split phrase may cross one
 // line break, but never a blank line, list item or heading boundary. The
@@ -112,7 +115,11 @@ function inspect(input) {
       return `[${kind} removed]`;
     });
   }
-  const injection = INJECTION_RULES.filter(([, re]) => re.test(text)).map(([why]) => why);
+  const injectionText = text.replace(INJECTION_INVISIBLE, '');
+  const injection = INJECTION_RULES.filter(([, re]) => re.test(injectionText)).map(([why]) => why);
+  if (injection.length && injectionText !== text) {
+    injection.push('contained invisible characters that can hide instructions');
+  }
   if (invisible) injection.push(`contained ${invisible} invisible character(s) that can hide instructions`);
   return { text, secrets: [...new Set(secrets)], injection };
 }
