@@ -241,6 +241,20 @@ test('guard: PyPI upload tokens are removed without flagging package references'
   }
 });
 
+test('guard: Linear API keys are redacted without masking ordinary identifiers', () => {
+  const token = `lin_api_${'Ab12'.repeat(10)}`;
+  assert.deepEqual(inspect(`Linear ${token} ready`).secrets, ['Linear API key']);
+  assert.equal(inspect(`Linear ${token} ready`).text, 'Linear [Linear API key removed] ready');
+  for (const ordinary of [
+    `lin_api_${'A'.repeat(39)}`,
+    `lin_api_${'B'.repeat(41)}`,
+    `lin_api_${'C'.repeat(39)}-`,
+    `pre${token}`,
+    `${token}_suffix`,
+    'Linear keys have a lin_api_ prefix.',
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
 test('guard: Discord bot tokens are redacted without catching similar dotted text', () => {
   for (const id of ['12345678901234567', '1234567890123456789', '12345678901234567890']) {
     assert.deepEqual(inspect(fakeDiscordToken(undefined, id)).secrets, ['Discord bot token']);
