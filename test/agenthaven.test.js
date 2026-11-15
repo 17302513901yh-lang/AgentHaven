@@ -256,6 +256,38 @@ test('HTTP API: CRUD, conflict status, host/origin protection, UI', async () => 
   }
 });
 
+test('HTTP API: known routes report 405 and oversized requests return 413 without changing the board', async () => {
+  const store = tmpStore();
+  const { server, url } = await start({ store });
+  try {
+    const wrongMethod = await fetch(`${url}api/tasks`, { method: 'PUT' });
+    assert.equal(wrongMethod.status, 405);
+    assert.equal(wrongMethod.headers.get('allow'), 'GET, POST');
+    assert.match((await wrongMethod.json()).error, /PUT.*GET, POST/);
+    const streamMethod = await fetch(`${url}api/stream`, { method: 'POST' });
+    assert.equal(streamMethod.status, 405);
+    assert.equal(streamMethod.headers.get('allow'), 'GET');
+    assert.equal((await fetch(`${url}api/no-such-route`)).status, 404);
+
+    const oversized = await fetch(`${url}api/tasks`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: 'oversized', data: 'a'.repeat(1_200_000) }),
+    });
+    assert.equal(oversized.status, 413);
+    assert.match((await oversized.json()).error, /too large \(max 1 MB\)/);
+    assert.equal(oversized.headers.get('connection'), 'close');
+    assert.deepEqual(store.listTasks(), []);
+
+    const valid = await fetch(`${url}api/tasks`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: 'normal' }),
+    });
+    assert.equal(valid.status, 201);
+    assert.equal(store.listTasks().length, 1);
+  } finally {
+    server.close();
+  }
+});
+
 test('HTTP API: PATCH /api/mode refuses a missing or non-boolean agentsOnly without changing the mode (#73)', async () => {
   const store = tmpStore();
   const { server, url } = await start({ store });
