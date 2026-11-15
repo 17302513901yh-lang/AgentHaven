@@ -4,6 +4,7 @@ All notable changes to AgentHaven. Full notes for each version are in [`docs/rel
 and the installers are on the [Releases page](https://github.com/laaielichter/AgentHaven/releases).
 
 ## Unreleased
+
 - **Guard removes Telegram bot tokens** (8–10 digits, a colon and 35 characters), alone, after `TELEGRAM_BOT_TOKEN=` or `BOT_TOKEN=`, and inside an `api.telegram.org/bot<token>/` URL, while leaving times, `host:port` pairs, shorter tails and shorter ids alone. Thanks to @IG-ABHINAV! (#76)
 - **Guard redacts Linear personal API keys** with the provider's `lin_api_` prefix and expected 40-character token body, without masking shorter or embedded identifiers.
 - **`PATCH /api/mode` no longer flips agents-only mode by accident**: `setMode` used `Boolean(agentsOnly)`, so `{}` and a misspelled field turned it off and the string `"false"` turned it on, all with a 200. Only the real booleans `true` / `false` are accepted now; anything else is a 400 (`agentsOnly must be true or false`) and leaves the mode unchanged. Thanks to @17302513901yh-lang! (#73, #82)
