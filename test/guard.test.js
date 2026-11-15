@@ -52,6 +52,32 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: redacts Cloudflare API credentials with strict shape and boundaries', () => {
+  for (const prefix of ['cfk', 'cfut', 'cfat']) {
+    const token = `${prefix}_${'Ab3x'.repeat(10)}a1b2c3d4`;
+    for (const input of [token, `Deploy with ${token} now`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Cloudflare API credential']);
+      assert.equal(result.text, input.replace(token, '[Cloudflare API credential removed]'));
+      assert.deepEqual(inspect(result.text).secrets, []);
+    }
+  }
+
+  const token = `cfk_${'Ab3x'.repeat(10)}a1b2c3d4`;
+  for (const ordinary of [
+    `cfk_${'A'.repeat(39)}a1b2c3d4`,
+    `cfut_${'A'.repeat(40)}xyzxyzxy`,
+    `cfat_${'A'.repeat(40)}a1b2c3d`,
+    `prefix_${token}`,
+    `${token}_suffix`,
+    `${token}f`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect(`cfk_${'A'.repeat(150_000)}`).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
+});
+
 test('guard: redacts values after quoted JSON and YAML secret keys', () => {
   for (const [input, expected] of [
     ['password: hunter2hunter2', 'password: [secret removed]'],
