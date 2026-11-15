@@ -8,6 +8,7 @@ const { execFileSync } = require('node:child_process');
 const { Store } = require('../src/store');
 const gitx = require('../src/git');
 const checks = require('../src/checks');
+const wb = require('../src/workboard');
 const { createHandler } = require('../src/mcp');
 
 // realpathSync.native expands Windows 8.3 short names (RUNNER~1), as git does.
@@ -74,6 +75,56 @@ test('code: conflict radar finds files changed on two branches', () => {
   assert.equal(r.conflicts.length, 1);
   assert.deepEqual(r.conflicts[0].files, ['src/a.js']);
   assert.deepEqual([r.conflicts[0].a.agent, r.conflicts[0].b.agent].sort(), ['claude', 'codex']);
+});
+
+test('workboard: worktree, scope and radar expose cross-agent file conflicts', () => {
+  const { s } = setup();
+  const dir = tmp('ah-wb-code-');
+  const file = path.join(dir, wb.BOARD);
+  wb.syncOnce(s, dir);
+  const run = (line) => {
+    fs.appendFileSync(file, `${line}\n`);
+    return wb.syncOnce(s, dir).results[0];
+  };
+  const a = s.createTask({ title: 'Security policy', files: ['src/a.js'], actor: 'you' });
+  const b = s.createTask({ title: 'Other policy', files: ['src/b.js'], actor: 'you' });
+  const aId = a.id.slice(5, 11);
+  const bId = b.id.slice(5, 11);
+  s.claimTask(a.id, { actor: 'codex' });
+  s.claimTask(b.id, { actor: 'claude' });
+
+  const denied = run(`mallory: worktree ${aId}`);
+  assert.equal(denied.ok, false, 'a foreign agent cannot create a task worktree');
+  assert.match(denied.message, /codex holds/);
+  assert.equal(run('codex: worktree nonexistent').ok, false);
+  assert.equal(run(`codex: worktree ${aId}`).ok, true);
+  assert.equal(run(`claude: worktree ${bId}`).ok, true);
+  const wa = s.getTask(a.id).worktree;
+  const wbPath = s.getTask(b.id).worktree.path;
+  assert.ok(fs.existsSync(path.join(wa.path, 'src/a.js')));
+
+  write(wa.path, 'src/a.js', 'authorized\n');
+  assert.equal(run(`codex: scope ${aId}`).ok, true);
+  assert.deepEqual(s.getTask(a.id).scope.changed, ['src/a.js']);
+  write(wa.path, 'src/b.js', 'foreign\n');
+  const unsafe = run(`codex: scope ${aId}`);
+  assert.equal(unsafe.ok, false, 'out-of-scope edits must be reported');
+  assert.match(unsafe.message, /src\/b\.js/);
+  assert.equal(s.getTask(a.id).scope.foreign[0].agent, 'claude');
+  assert.equal(run('codex: scope nonexistent').ok, false);
+
+  write(wbPath, 'src/a.js', 'conflicting\n');
+  const radar = run('codex: radar');
+  assert.equal(radar.ok, false, 'overlapping worktrees must be reported');
+  assert.match(radar.message, /src\/a\.js/);
+  assert.match(radar.message, /codex/);
+  assert.match(radar.message, /claude/);
+
+  const empty = new Store({ dataDir: tmp('ah-wb-no-repo-') });
+  const emptyDir = tmp('ah-wb-empty-');
+  wb.syncOnce(empty, emptyDir);
+  fs.appendFileSync(path.join(emptyDir, wb.BOARD), 'codex: radar\n');
+  assert.match(wb.syncOnce(empty, emptyDir).results[0].message, /no repository set/);
 });
 
 test('code: approval needs AgentHaven\'s own passing checks on the submitted commit', async () => {
