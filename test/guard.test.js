@@ -136,6 +136,33 @@ test('guard: Sentry organization auth tokens are removed without matching near m
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
 });
 
+test('guard: masks Supabase secret keys but never publishable keys', () => {
+  const random = 'aB3_'.repeat(5) + 'Q-';
+  const checksum = '7Z_4x0-a';
+  const token = `sb_secret_${random}_${checksum}`;
+  for (const input of [token, `connect ${token} now`, `apikey: ${token}`]) {
+    const scanned = inspect(input);
+    assert.deepEqual(scanned.secrets, ['Supabase secret key'], input);
+    assert.equal(scanned.text, input.replace(token, '[Supabase secret key removed]'), input);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    `sb_publishable_${random}_${checksum}`,
+    `sb_secret_${random.slice(1)}_${checksum}`,
+    `sb_secret_${random}A_${checksum}`,
+    `sb_secret_${random}_${checksum.slice(1)}`,
+    `sb_secret_${random}_${checksum}A`,
+    `prefix${token}`,
+    `_${token}`,
+    `${token}_suffix`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('sb_secret_' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Supabase pattern exceeded 500 ms');
+});
+
 test('guard: Telegram bot tokens are removed without catching lookalikes', () => {
   const token = '123456789:' + 'A'.repeat(35);
   for (const input of [
