@@ -12,6 +12,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 - **The local HTTP API reports 405 for known paths with the wrong method and 413 for bodies over 1 MB**, including an `Allow` header or a clear size-limit error; other requests continue working. (#78)
 - **Tests for the `review`, `reject` and `resolve` Inbox commands:** `WORKBOARD.md` commands that decide who may submit, review and resolve an escalation are now run end to end through the file, with their refusals: the wrong agent, a submission without `| verified: ...`, a rejection without a reason, and a `resolve` by an agent that is not the lead. Ten of the 13 untested commands in #48 remain open. Thanks to @jdotc1! (#48, #70)
 - **A `progress` line without a percentage is refused**: `WORKBOARD.md` now answers ✗ with the documented syntax for a line that has neither a valid `N%` nor any `| key=value` metrics, instead of silently recording nothing with a ✓ and a "—%" result. A metrics-only line stays valid. Thanks to @17302513901yh-lang! (#44, #55)
+- **Guard redacts Azure Storage account keys in connection strings**, preserving `AccountKey=` and the surrounding fields and ignoring values that do not match the expected Base64 key shape.
 
 ## 0.8.2
 

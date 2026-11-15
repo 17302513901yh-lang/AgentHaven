@@ -41,6 +41,7 @@ const SECRET_RULES = [
   ['Telegram bot token', /(?<!\d)\d{8,10}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g],
   ['AWS access key', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
+  ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
@@ -112,6 +113,7 @@ function inspect(input) {
       if (kind === 'password') return `${m[1]}[secret removed]`;
       if (kind === 'connection string password') return `${m[1]}[secret removed]${m[3]}`;
       if (kind === 'authorization token') return `${m[1]}[authorization token removed]`;
+      if (kind === 'Azure Storage account key') return `${m[1]}[Azure Storage account key removed]`;
       return `[${kind} removed]`;
     });
   }
