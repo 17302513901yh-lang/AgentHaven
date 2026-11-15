@@ -5,6 +5,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard redacts Azure Storage account keys in connection strings**, preserving `AccountKey=` and the surrounding fields and ignoring values that do not match the expected Base64 key shape.
 - **Guard removes Telegram bot tokens** (8–10 digits, a colon and 35 characters), alone, after `TELEGRAM_BOT_TOKEN=` or `BOT_TOKEN=`, and inside an `api.telegram.org/bot<token>/` URL, while leaving times, `host:port` pairs, shorter tails and shorter ids alone. Thanks to @IG-ABHINAV! (#76)
 - **`PATCH /api/mode` no longer flips agents-only mode by accident**: `setMode` used `Boolean(agentsOnly)`, so `{}` and a misspelled field turned it off and the string `"false"` turned it on, all with a 200. Only the real booleans `true` / `false` are accepted now; anything else is a 400 (`agentsOnly must be true or false`) and leaves the mode unchanged. Thanks to @17302513901yh-lang! (#73, #82)
 - **Expected mistakes on the command line print one line, not a stack trace:** `radar`, `repo <folder that is not a git repo>`, an invalid `--workspace`, `connect --off <unknown client>` and `mcp --tools <unknown profile>` now print the message and exit 1; `serve --port abc` gets a short `--port must be a number from 0 to 65535`. Errors that are not caused by user input still show their stack, and `AGENTHAVEN_DEBUG=1` shows it for any error. Thanks to @17302513901yh-lang! (#42, #69)
