@@ -5,15 +5,15 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
-- **Guard detects instructions disguised with soft hyphens and word-internal invisible joiners**, while preserving ordinary emoji, text, and script joiners in stored notes. (#77)
+- **Guard detects instructions disguised with soft hyphens and word-internal invisible joiners**, while preserving ordinary emoji, text, and script joiners in stored notes. Thanks to @jdotc1! (#77, #89)
 - **Guard removes Telegram bot tokens** (8–10 digits, a colon and 35 characters), alone, after `TELEGRAM_BOT_TOKEN=` or `BOT_TOKEN=`, and inside an `api.telegram.org/bot<token>/` URL, while leaving times, `host:port` pairs, shorter tails and shorter ids alone. Thanks to @IG-ABHINAV! (#76)
-- **Guard redacts Linear personal API keys** with the provider's `lin_api_` prefix and expected 40-character token body, without masking shorter or embedded identifiers.
+- **Guard redacts Linear personal API keys** with the provider's `lin_api_` prefix and expected 40-character token body, without masking shorter or embedded identifiers. Thanks to @jdotc1! (#92)
 - **`PATCH /api/mode` no longer flips agents-only mode by accident**: `setMode` used `Boolean(agentsOnly)`, so `{}` and a misspelled field turned it off and the string `"false"` turned it on, all with a 200. Only the real booleans `true` / `false` are accepted now; anything else is a 400 (`agentsOnly must be true or false`) and leaves the mode unchanged. Thanks to @17302513901yh-lang! (#73, #82)
 - **Expected mistakes on the command line print one line, not a stack trace:** `radar`, `repo <folder that is not a git repo>`, an invalid `--workspace`, `connect --off <unknown client>` and `mcp --tools <unknown profile>` now print the message and exit 1; `serve --port abc` gets a short `--port must be a number from 0 to 65535`. Errors that are not caused by user input still show their stack, and `AGENTHAVEN_DEBUG=1` shows it for any error. Thanks to @17302513901yh-lang! (#42, #69)
-- **The local HTTP API reports 405 for known paths with the wrong method and 413 for bodies over 1 MB**, including an `Allow` header or a clear size-limit error; other requests continue working. (#78)
+- **The local HTTP API reports 405 for known paths with the wrong method and 413 for bodies over 1 MB**, including an `Allow` header or a clear size-limit error; other requests continue working. Thanks to @jdotc1! (#78, #90)
 - **Tests for the `review`, `reject` and `resolve` Inbox commands:** `WORKBOARD.md` commands that decide who may submit, review and resolve an escalation are now run end to end through the file, with their refusals: the wrong agent, a submission without `| verified: ...`, a rejection without a reason, and a `resolve` by an agent that is not the lead. Ten of the 13 untested commands in #48 remain open. Thanks to @jdotc1! (#48, #70)
 - **A `progress` line without a percentage is refused**: `WORKBOARD.md` now answers ✗ with the documented syntax for a line that has neither a valid `N%` nor any `| key=value` metrics, instead of silently recording nothing with a ✓ and a "—%" result. A metrics-only line stays valid. Thanks to @17302513901yh-lang! (#44, #55)
-- **Guard redacts Azure Storage account keys in connection strings**, preserving `AccountKey=` and the surrounding fields and ignoring values that do not match the expected Base64 key shape.
+- **Guard redacts Azure Storage account keys in connection strings**, preserving `AccountKey=` and the surrounding fields and ignoring values that do not match the expected Base64 key shape. Thanks to @jdotc1! (#91)
 
 ## 0.8.2
 
