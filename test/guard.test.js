@@ -52,26 +52,6 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
-test('guard: redacts private PostHog tokens but leaves public project keys', () => {
-  for (const prefix of ['phx', 'phs', 'pha', 'phr']) {
-    const token = `${prefix}_${'Ab3x-'.repeat(8)}`;
-    const input = `PostHog credential: ${token} done`;
-    const result = inspect(input);
-    assert.deepEqual(result.secrets, ['PostHog private token']);
-    assert.equal(result.text, input.replace(token, '[PostHog private token removed]'));
-    assert.deepEqual(inspect(result.text).secrets, []);
-  }
-
-  const privateToken = `phx_${'Ab3x-'.repeat(8)}`;
-  for (const ordinary of [
-    `phc_${'Ab3x-'.repeat(8)}`,
-    `phx_${'A'.repeat(19)}`,
-    `phr_${'A'.repeat(129)}`,
-    `prefix_${privateToken}`,
-    `phx_${'A'.repeat(150_000)}`,
-  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
-});
-
 test('guard: redacts values after quoted JSON and YAML secret keys', () => {
   for (const [input, expected] of [
     ['password: hunter2hunter2', 'password: [secret removed]'],
@@ -489,4 +469,24 @@ test('guard: WORKBOARD.md commands pass the guard too', () => {
   const text = fs.readFileSync(path.join(dir, wb.BOARD), 'utf8') + fs.readFileSync(path.join(dir, wb.LOGBOOK), 'utf8');
   assert.ok(!text.includes('sk-proj-abcdefghij'));
   assert.match(s.listNotes()[0].body, /\[secret removed\]|\[OpenAI key removed\]/);
+});
+
+test('guard: redacts private PostHog tokens but leaves public project keys', () => {
+  for (const prefix of ['phx', 'phs', 'pha', 'phr']) {
+    const token = `${prefix}_${'Ab3x-'.repeat(8)}`;
+    const input = `PostHog credential: ${token} done`;
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['PostHog private token']);
+    assert.equal(result.text, input.replace(token, '[PostHog private token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+
+  const privateToken = `phx_${'Ab3x-'.repeat(8)}`;
+  for (const ordinary of [
+    `phc_${'Ab3x-'.repeat(8)}`,
+    `phx_${'A'.repeat(19)}`,
+    `phr_${'A'.repeat(129)}`,
+    `prefix_${privateToken}`,
+    `phx_${'A'.repeat(150_000)}`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
 });
