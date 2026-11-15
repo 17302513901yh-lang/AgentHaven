@@ -663,6 +663,45 @@ test('workboard: handoff, release and block enforce claim ownership; comment val
   assert.equal(s.getTask(task.id).assignee, null);
 });
 
+test('workboard: uncheck respects claim ownership and alive renews only owned claims', () => {
+  const s = tmpStore();
+  const dir = tmpDir('ah-wb-criteria-');
+  const file = path.join(dir, wb.BOARD);
+  wb.syncOnce(s, dir);
+  const run = (line) => {
+    fs.appendFileSync(file, `${line}\n`);
+    return wb.syncOnce(s, dir).results[0];
+  };
+  const task = s.createTask({ title: 'Verify dependencies', criteria: ['checked lockfile', 'verified hashes'], actor: 'you' });
+  const id = task.id.slice(5, 11);
+  s.claimTask(task.id, { actor: 'codex' });
+  assert.equal(run(`codex: check ${id} 1`).ok, true);
+  assert.equal(s.getTask(task.id).criteria[0].done, true);
+
+  assert.equal(run(`intruder: uncheck ${id} 1`).ok, false, 'other agents cannot reopen checked criteria');
+  assert.equal(s.getTask(task.id).criteria[0].done, true);
+  assert.equal(s.getTask(task.id).assignee, 'codex');
+  assert.equal(run(`intruder: check ${id} 2`).ok, false, 'other agents cannot satisfy criteria');
+  assert.equal(s.getTask(task.id).criteria[1].done, false);
+  assert.equal(run(`codex: uncheck ${id} 99`).ok, false, 'invalid criteria must be refused');
+  assert.equal(s.getTask(task.id).criteria[0].done, true);
+
+  assert.equal(run(`codex: uncheck ${id} 1`).ok, true);
+  assert.equal(s.getTask(task.id).criteria[0].done, false);
+  assert.equal(s.getTask(task.id).criteria[1].done, false);
+  assert.equal(run(`you: check ${id} 2`).ok, true, 'a human retains override authority');
+  assert.equal(s.getTask(task.id).criteria[1].done, true);
+
+  const lease = s.getTask(task.id).leaseUntil;
+  assert.equal(run('intruder: alive').ok, true, 'a heartbeat with no claim is allowed');
+  assert.equal(s.getTask(task.id).leaseUntil, lease, 'other agents cannot extend this lease');
+  assert.equal(run('no spaces allowed: alive').ok, false, 'malformed agent names are refused');
+  const renewed = run('codex: alive dependency scan running');
+  assert.equal(renewed.ok, true);
+  assert.match(renewed.message, /renewed 1 claim/);
+  assert.ok(s.getTask(task.id).leaseUntil >= lease);
+});
+
 test('setMode only accepts a real boolean, so a typo cannot flip agents-only mode (#73)', () => {
   const s = tmpStore();
   const initial = s.stats().agentsOnly;
