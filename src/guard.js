@@ -34,10 +34,15 @@ const SECRET_RULES = [
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
+  ['Linear API key', /(?<![A-Za-z0-9_])lin_api_[A-Za-z0-9]{40}(?![A-Za-z0-9_])/g],
   ['DigitalOcean token', /(?<![A-Za-z0-9_])(?:dop|doo|dor)_v1_[0-9a-f]{64}(?![A-Za-z0-9_])/g],
   ['Shopify token', /(?<![A-Za-z0-9_])(?:shpat|shpca|shppa|shpss)_[0-9a-fA-F]{32}(?![A-Za-z0-9_])/g],
+  // Telegram bot tokens are 8-10 digits, a colon and 35 characters. No word
+  // boundary in front: in an API URL the token follows `bot` directly.
+  ['Telegram bot token', /(?<!\d)\d{8,10}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g],
   ['AWS access key', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
+  ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
@@ -57,6 +62,9 @@ const SECRET_RULES = [
 
 // Zero-width and bidi controls, and the Unicode "tag" block used to hide text from people.
 const INVISIBLE = /[\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]|[\u{E0000}-\u{E007F}]/gu;
+// Preserve these characters in stored text (notably emoji/script joiners), but
+// disregard them when deciding whether the text contains an injected command.
+const INJECTION_INVISIBLE = /[\u00AD\u034F\u180E\u200D]/gu;
 
 // Keep the original same-line override rule. A split phrase may cross one
 // line break, but never a blank line, list item or heading boundary. The
@@ -106,10 +114,15 @@ function inspect(input) {
       if (kind === 'password') return `${m[1]}[secret removed]`;
       if (kind === 'connection string password') return `${m[1]}[secret removed]${m[3]}`;
       if (kind === 'authorization token') return `${m[1]}[authorization token removed]`;
+      if (kind === 'Azure Storage account key') return `${m[1]}[Azure Storage account key removed]`;
       return `[${kind} removed]`;
     });
   }
-  const injection = INJECTION_RULES.filter(([, re]) => re.test(text)).map(([why]) => why);
+  const injectionText = text.replace(INJECTION_INVISIBLE, '');
+  const injection = INJECTION_RULES.filter(([, re]) => re.test(injectionText)).map(([why]) => why);
+  if (injection.length && injectionText !== text) {
+    injection.push('contained invisible characters that can hide instructions');
+  }
   if (invisible) injection.push(`contained ${invisible} invisible character(s) that can hide instructions`);
   return { text, secrets: [...new Set(secrets)], injection };
 }

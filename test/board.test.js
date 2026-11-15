@@ -616,6 +616,47 @@ test('workboard: inbox, questions, messages, split, lead and goal by file', () =
   assert.equal(s.stats().goal.text, 'Release 2.0');
 });
 
+test('workboard: handoff, release and block enforce claim ownership; comment validates its target', () => {
+  const s = tmpStore();
+  const dir = tmpDir('ah-wb-ownership-');
+  const file = path.join(dir, wb.BOARD);
+  wb.syncOnce(s, dir);
+  const run = (line) => {
+    fs.appendFileSync(file, `${line}\n`);
+    return wb.syncOnce(s, dir).results[0];
+  };
+  const task = s.createTask({ title: 'Check release permissions', actor: 'you' });
+  const id = task.id.slice(5, 11);
+  s.claimTask(task.id, { actor: 'claude' });
+
+  for (const line of [
+    `mallory: handoff ${id} -> mallory steal the task`,
+    `mallory: release ${id}`,
+    `mallory: block ${id} unauthorized block`,
+  ]) {
+    const result = run(line);
+    assert.equal(result.ok, false, line);
+    assert.match(result.message, /claude|holds|claim/i);
+    assert.equal(s.getTask(task.id).assignee, 'claude');
+    assert.equal(s.getTask(task.id).status, 'doing');
+  }
+
+  assert.equal(run(`claude: handoff ${id} -> codex verified parser | run integration tests`).ok, true);
+  assert.equal(s.getTask(task.id).assignee, 'codex');
+  assert.match(s.getTask(task.id).handoffs.at(-1).nextSteps, /integration tests/);
+  assert.equal(run(`claude: release ${id}`).ok, false, 'previous owner cannot release transferred work');
+
+  assert.equal(run(`codex: comment ${id} Parser verified`).ok, true);
+  assert.match(s.getTask(task.id).comments.at(-1).body, /Parser verified/);
+  assert.equal(run('codex: comment nonexistent Parser verified').ok, false);
+
+  assert.equal(run(`codex: block ${id} awaiting upstream permission`).ok, true);
+  assert.equal(s.getTask(task.id).status, 'blocked');
+  assert.match(s.getTask(task.id).blockedReason, /upstream permission/);
+  assert.equal(run(`codex: release ${id} cannot proceed`).ok, true);
+  assert.equal(s.getTask(task.id).assignee, null);
+});
+
 test('setMode only accepts a real boolean, so a typo cannot flip agents-only mode (#73)', () => {
   const s = tmpStore();
   const initial = s.stats().agentsOnly;
