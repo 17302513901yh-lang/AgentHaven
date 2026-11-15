@@ -108,6 +108,28 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
+  const token = 'ntn_' + 'Ab3_'.repeat(7);
+  for (const input of [token, `connect using ${token}`, `Authorization: Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Notion integration token'], input);
+    assert.equal(result.text, input.replace(token, '[Notion integration token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const ordinary of [
+    'ntn_ is the documented prefix for Notion integrations',
+    'ntn_' + 'a'.repeat(19),
+    `not${token}`,
+    `prefix_${token}`,
+    'notion_sample_integration_id',
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+
+  const longInput = 'ntn_' + 'a'.repeat(150_000);
+  const started = process.hrtime.bigint();
+  inspect(longInput);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Notion pattern exceeded 500 ms');
+});
+
 test('guard: Telegram bot tokens are removed without catching lookalikes', () => {
   const token = '123456789:' + 'A'.repeat(35);
   for (const input of [
