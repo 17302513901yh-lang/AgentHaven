@@ -136,6 +136,29 @@ test('guard: Sentry organization auth tokens are removed without matching near m
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
 });
 
+test('guard: Docker Hub access tokens are removed without catching ordinary names', () => {
+  for (const prefix of ['dckr_pat_', 'dckr_oat_']) {
+    const token = prefix + 'aB3_-xY7'.repeat(4);
+    for (const input of [token, `docker login with ${token}`, `secret: ${token}`]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['Docker Hub access token'], input);
+      assert.equal(scanned.text, input.replace(token, '[Docker Hub access token removed]'), input);
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+    }
+    for (const ordinary of [
+      prefix + 'A'.repeat(15),
+      prefix + 'A'.repeat(257),
+      `prefix${token}`,
+      `_${token}`,
+    ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+  }
+  assert.deepEqual(inspect('dckr_public_example').secrets, []);
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('dckr_pat_' + 'a'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Docker token pattern exceeded 500 ms');
+});
+
 test('guard: Telegram bot tokens are removed without catching lookalikes', () => {
   const token = '123456789:' + 'A'.repeat(35);
   for (const input of [
