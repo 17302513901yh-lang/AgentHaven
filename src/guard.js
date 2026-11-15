@@ -46,6 +46,8 @@ const SECRET_RULES = [
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
   ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
+  // Include app-level (Socket Mode) tokens, including their rotating form.
+  ['Slack app-level token', /(?<![A-Za-z0-9_-])(?:xoxe\.)?xapp-[A-Za-z0-9-]{20,256}(?![A-Za-z0-9-])/g],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],

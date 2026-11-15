@@ -136,6 +136,31 @@ test('guard: Sentry organization auth tokens are removed without matching near m
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
 });
 
+test('guard: redacts Slack app-level and rotating tokens', () => {
+  const token = 'xapp-1-' + 'A12345-'.repeat(5);
+  const rotating = 'xoxe.' + token;
+  for (const secret of [token, rotating]) {
+    for (const input of [secret, `SLACK_APP_TOKEN=${secret}`, `send ${secret}.`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Slack app-level token']);
+      assert.equal(result.text, input.replace(secret, '[Slack app-level token removed]'));
+      assert.deepEqual(inspect(result.text).secrets, []);
+    }
+  }
+
+  for (const ordinary of [
+    'xapp- denotes an app-level token',
+    'xapp-' + 'A'.repeat(19),
+    'xapp-' + 'A'.repeat(257),
+    `prefix${token}`,
+    `_${token}`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('xapp-' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Slack pattern exceeded 500 ms');
+});
+
 test('guard: Telegram bot tokens are removed without catching lookalikes', () => {
   const token = '123456789:' + 'A'.repeat(35);
   for (const input of [
