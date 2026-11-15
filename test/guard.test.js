@@ -136,6 +136,29 @@ test('guard: Sentry organization auth tokens are removed without matching near m
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
 });
 
+test('guard: redacts Stripe webhook signing secrets without catching lookalikes', () => {
+  const token = 'whsec_' + 'aB3cD4eF'.repeat(4);
+  for (const input of [token, `STRIPE_WEBHOOK_SECRET=${token}`, `verify using ${token}.`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Stripe webhook secret']);
+    assert.equal(result.text, input.replace(token, '[Stripe webhook secret removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+  for (const ordinary of [
+    'whsec_ is the Stripe webhook signing secret prefix',
+    'whsec_' + 'a'.repeat(19),
+    'whsec_' + 'a'.repeat(129),
+    `prefix${token}`,
+    `_${token}`,
+    `${token}_suffix`,
+    'pk_live_' + 'a'.repeat(32),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('whsec_' + 'a'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Stripe pattern exceeded 500 ms');
+});
+
 test('guard: Telegram bot tokens are removed without catching lookalikes', () => {
   const token = '123456789:' + 'A'.repeat(35);
   for (const input of [
