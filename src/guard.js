@@ -30,6 +30,8 @@ const SECRET_RULES = [
   ['OpenAI key', /\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}/g],
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
   ['SendGrid key', /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}(?=[^A-Za-z0-9_-]|$)/g],
+  // The encoded JSON payload is bounded; the last 43 characters are the secret.
+  ['Sentry organization token', /(?<![A-Za-z0-9_])sntrys_eyJ[A-Za-z0-9+/]{16,800}={0,2}_[A-Za-z0-9+/]{43}(?![A-Za-z0-9+/=_])/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
@@ -47,7 +49,8 @@ const SECRET_RULES = [
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
-  ['Notion integration token', /(?<![A-Za-z0-9_-])ntn_[A-Za-z0-9_-]{20,}(?![A-Za-z0-9_-])/g],
+  // Use the scanner-observed token shape, not a broad prefix that eats identifiers.
+  ['Notion integration token', /(?<![A-Za-z0-9_-])ntn_[0-9]{11}[A-Za-z0-9]{35}(?![A-Za-z0-9_-])/g],
   // PyPI macaroons use pypi- followed by at least 85 base64url characters.
   ['PyPI token', /(?<![A-Za-z0-9_-])pypi-[A-Za-z0-9_-]{85,}(?![A-Za-z0-9_-])/g],
   ['JWT', /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g],

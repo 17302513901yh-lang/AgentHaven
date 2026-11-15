@@ -109,7 +109,7 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
 });
 
 test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
-  const token = 'ntn_' + 'Ab3_'.repeat(7);
+  const token = 'ntn_' + '12345678901' + 'Ab3'.repeat(11) + 'Cd';
   for (const input of [token, `connect using ${token}`, `Authorization: Bearer ${token}`]) {
     const result = inspect(input);
     assert.deepEqual(result.secrets, ['Notion integration token'], input);
@@ -118,16 +118,59 @@ test('guard: Notion integration tokens are removed without catching ordinary ide
   }
   for (const ordinary of [
     'ntn_ is the documented prefix for Notion integrations',
+    'const ntn_default_workspace_settings = 1',
+    'ntn_integration_token_env_var',
+    'ntn_create_page_with_children',
+    'files: ntn_sync-worker-configuration.yaml',
+    'ntn_' + '_'.repeat(25),
+    'ntn_' + '-'.repeat(25),
     'ntn_' + 'a'.repeat(19),
+    'ntn_' + '1234567890' + 'A'.repeat(36),
+    'ntn_' + '12345678901' + 'A'.repeat(34),
+    'ntn_' + '12345678901' + 'A'.repeat(36),
+    'ntn_' + '12345678901' + 'A'.repeat(17) + '_' + 'A'.repeat(17),
+    'ntn_' + '12345678901' + 'A'.repeat(17) + '-' + 'A'.repeat(17),
     `not${token}`,
     `prefix_${token}`,
+    `-${token}`,
+    `${token}suffix`,
+    `${token}_suffix`,
+    `${token}-suffix`,
     'notion_sample_integration_id',
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 
-  const longInput = 'ntn_' + 'a'.repeat(150_000);
+  const longInput = 'ntn_' + '12345678901' + 'a'.repeat(150_000);
   const started = process.hrtime.bigint();
-  inspect(longInput);
+  assert.deepEqual(inspect(longInput).secrets, []);
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Notion pattern exceeded 500 ms');
+});
+
+test('guard: Sentry organization auth tokens are removed without matching near misses', () => {
+  const payload = 'eyJpYXQiOi' + 'A1b2'.repeat(12) + '==';
+  const secret = 'bC3/'.repeat(10) + 'x+y';
+  const token = `sntrys_${payload}_${secret}`;
+
+  for (const input of [token, `deploy ${token} now`, `curl -H "Authorization: Bearer ${token}"`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Sentry organization token'], input);
+    assert.equal(result.text, input.replace(token, '[Sentry organization token removed]'), input);
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const nearMiss of [
+    `sntrys_${payload}_${'A'.repeat(42)}`,
+    `sntrys_${payload}_${'A'.repeat(44)}`,
+    `sntrys_eyJshort_${'A'.repeat(43)}`,
+    `sntrys_eyJ${'A'.repeat(801)}_${'B'.repeat(43)}`,
+    `prefix${token}`,
+    `${token}_suffix`,
+    `${token}/suffix`,
+  ]) assert.deepEqual(inspect(nearMiss).secrets, [], nearMiss.slice(0, 75));
+
+  const longInput = 'sntrys_eyJ' + 'A'.repeat(150_000);
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect(longInput).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
 });
 
 test('guard: Telegram bot tokens are removed without catching lookalikes', () => {
