@@ -194,9 +194,9 @@ function createServer({ store, dataDir, human = 'you', onError = () => {}, dream
   }
 
   const server = http.createServer((req, res) => {
-    const send = (status, body, type = 'application/json') => {
+    const send = (status, body, type = 'application/json', extraHeaders = {}) => {
       res.writeHead(status, { 'Content-Type': type, 'X-Content-Type-Options': 'nosniff', 'Cache-Control': 'no-store',
-        'Content-Security-Policy': "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; frame-ancestors 'none'" });
+        'Content-Security-Policy': "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; frame-ancestors 'none'", ...extraHeaders });
       res.end(type === 'application/json' ? JSON.stringify(body) : body);
     };
     const port = server.address().port;
@@ -214,12 +214,28 @@ function createServer({ store, dataDir, human = 'you', onError = () => {}, dream
       if (header !== undefined && !AGENT_RE.test(header)) return send(400, { error: 'X-AgentHaven-Agent may use letters, digits, . _ - @' });
       const ctx = { s, actor: header || human, asAgent: header !== undefined };
       if (url.pathname === '/api/stream' && req.method === 'GET') return stream(req, res, s);
+      if (url.pathname === '/api/stream') return send(405, { error: `${req.method} is not allowed on /api/stream; use GET` }, 'application/json', { Allow: 'GET' });
+      const allowedMethods = [];
       for (const [method, re, fn] of routes) {
         const m = url.pathname.match(re);
-        if (!m || method !== req.method) continue;
+        if (!m) continue;
+        if (!allowedMethods.includes(method)) allowedMethods.push(method);
+        if (method !== req.method) continue;
         let raw = '';
-        req.on('data', (c) => { raw += c; if (raw.length > 1e6) req.destroy(); });
+        let size = 0;
+        let tooLarge = false;
+        req.on('data', (c) => {
+          if (tooLarge) return;
+          size += c.length;
+          if (size > 1e6) {
+            tooLarge = true;
+            raw = '';
+            return send(413, { error: 'request body is too large (max 1 MB)' }, 'application/json', { Connection: 'close' });
+          }
+          raw += c;
+        });
         req.on('end', () => {
+          if (tooLarge) return;
           try {
             if (!['GET', 'DELETE'].includes(req.method) && raw && !String(req.headers['content-type']).startsWith('application/json')) return send(415, { error: 'use application/json' });
             const body = raw ? JSON.parse(raw) : {};
@@ -232,6 +248,7 @@ function createServer({ store, dataDir, human = 'you', onError = () => {}, dream
         });
         return;
       }
+      if (allowedMethods.length) return send(405, { error: `${req.method} is not allowed on ${url.pathname}; use ${allowedMethods.join(', ')}` }, 'application/json', { Allow: allowedMethods.join(', ') });
       return send(404, { error: 'not found' });
     }
 

@@ -33,6 +33,7 @@ through it, so a rule changed there applies everywhere.
 2. Keep each pull request to one change, with a [conventional commit](https://www.conventionalcommits.org/) title (`feat:`, `fix:`, `docs:`, `ci:`).
 3. Add or update tests, and the README or website when behaviour changes.
 4. Run `npm run lint && npm test`, and say in the pull request what you changed and how you checked it.
+5. Do not edit `CHANGELOG.md` in your pull request; the maintainer adds the entry, with credit to you, when it is merged. This keeps pull requests from conflicting with each other.
 
 All repo-facing text (code, docs, UI, commits) is in English.
 
