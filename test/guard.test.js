@@ -108,6 +108,34 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: Sentry organization auth tokens are removed without matching near misses', () => {
+  const payload = 'eyJpYXQiOi' + 'A1b2'.repeat(12) + '==';
+  const secret = 'bC3/'.repeat(10) + 'x+y';
+  const token = `sntrys_${payload}_${secret}`;
+
+  for (const input of [token, `deploy ${token} now`, `curl -H "Authorization: Bearer ${token}"`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Sentry organization token'], input);
+    assert.equal(result.text, input.replace(token, '[Sentry organization token removed]'), input);
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const nearMiss of [
+    `sntrys_${payload}_${'A'.repeat(42)}`,
+    `sntrys_${payload}_${'A'.repeat(44)}`,
+    `sntrys_eyJshort_${'A'.repeat(43)}`,
+    `sntrys_eyJ${'A'.repeat(801)}_${'B'.repeat(43)}`,
+    `prefix${token}`,
+    `${token}_suffix`,
+    `${token}/suffix`,
+  ]) assert.deepEqual(inspect(nearMiss).secrets, [], nearMiss.slice(0, 75));
+
+  const longInput = 'sntrys_eyJ' + 'A'.repeat(150_000);
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect(longInput).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
+});
+
 test('guard: Telegram bot tokens are removed without catching lookalikes', () => {
   const token = '123456789:' + 'A'.repeat(35);
   for (const input of [
