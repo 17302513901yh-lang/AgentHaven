@@ -963,6 +963,9 @@ class Store {
     if (typeof done !== 'boolean') throw new ValidationError('done must be true or false');
     return this.withLock((data) => {
       const task = Store.findTask(data, id);
+      if (task.assignee !== actor && !Store.isAuthority(data, actor)) {
+        throw new ConflictError(task.assignee ? `${task.assignee} holds this task` : 'claim the task first', task);
+      }
       const c = task.criteria.find((x, i) => x.id === criterion || String(i + 1) === String(criterion) || x.text === criterion);
       if (!c) throw new NotFoundError(`criterion ${criterion} not found (use its id, its number from 1, or its exact text)`);
       Object.assign(c, done ? { done: true, by: actor, at: now() } : { done: false, by: undefined, at: undefined });
