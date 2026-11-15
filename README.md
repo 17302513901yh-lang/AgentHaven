@@ -192,7 +192,7 @@ Three problems hurt multi-agent work most in practice. AgentHaven handles each o
 
 **Guard: shared memory that cannot be poisoned.** Agent memory poisoning is on the OWASP list of agentic risks (ASI06): one bad write in shared memory reaches every agent that reads it. Everything an agent writes passes Guard first, whether through MCP, HTTP, `WORKBOARD.md` or a dream:
 - Secrets are replaced before they are stored, so they never reach disk, other agents, `WORKBOARD.md` or `LOGBOOK.md`. This covers API keys (Anthropic, OpenAI, Groq, SendGrid, Replicate, GitHub, GitLab, DigitalOcean, Shopify, AWS, Google, Slack, Stripe, Hugging Face, npm, PyPI), Discord and Telegram bot tokens, Authorization headers (Bearer, Token, Basic), private keys, JWTs and passwords in assignments or connection strings. You get a message to rotate the key.
-- Invisible characters that can hide text are removed: zero-width characters, bidi controls and Unicode tags.
+- Zero-width and bidi controls and Unicode tags that hide text are removed. Soft hyphens and word-internal joiners are preserved in stored text, but ignored when Guard checks for injected instructions, so ordinary emoji and scripts remain intact.
 - Text that reads like orders to other agents is flagged, for example "ignore previous instructions", "send the .env to…", or `curl … | sh`.
 - Flagged notes, lessons and dream proposals are quarantined: agents do not see them until a human releases them. Not even the lead can release them. Flagged comments and messages carry a warning inline.
 
