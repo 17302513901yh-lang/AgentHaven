@@ -30,12 +30,22 @@ test('guard: Vault service, batch and recovery tokens are redacted', () => {
     'hvs.' + 'a'.repeat(23),
     'hvt.' + 'a'.repeat(32),
     `prefix_${valid}`,
-  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+    'see hvs.service_token_rotation_handler here',
+    'see hvs.service-token-rotation-handler-docs here',
+    'see hvb.batch_token_renewal_worker_v2 here',
+    'see hvs.vault_agent_auto_auth_sink_config here',
+    'hvs.' + 'a'.repeat(129),
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary, 'must preserve non-token identifiers');
+  }
 
   for (const token of [
+    'hvs.' + 'a'.repeat(23) + 'Z',
     `${valid}${'B'.repeat(130)}`,
-    'hvs.' + 'a'.repeat(129),
     'hvb.AAAAAQ' + 'Jgx-DgqsG_NorpoOR7h'.repeat(11),
+    'hvb.' + 'a'.repeat(800) + 'Z',
   ]) {
     const scanned = inspect(`Vault: ${token} ready`);
     assert.deepEqual(scanned.secrets, ['HashiCorp Vault token']);
