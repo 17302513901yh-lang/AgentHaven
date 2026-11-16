@@ -52,6 +52,53 @@ test('guard: finds secrets of the common kinds and keeps the rest of the text', 
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: redacts Cloudflare API credentials with strict shape and boundaries', () => {
+  for (const prefix of ['cfk', 'cfut', 'cfat']) {
+    const token = `${prefix}_${'Ab3x'.repeat(10)}a1b2c3d4`;
+    for (const input of [token, `Deploy with ${token} now`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Cloudflare API credential']);
+      assert.equal(result.text, input.replace(token, '[Cloudflare API credential removed]'));
+      assert.deepEqual(inspect(result.text).secrets, []);
+    }
+  }
+
+  const token = `cfk_${'Ab3x'.repeat(10)}a1b2c3d4`;
+  for (const ordinary of [
+    `cfk_${'A'.repeat(39)}a1b2c3d4`,
+    `cfut_${'A'.repeat(40)}xyzxyzxy`,
+    `cfat_${'A'.repeat(40)}a1b2c3d`,
+    `prefix_${token}`,
+    `${token}_suffix`,
+    `${token}f`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect(`cfk_${'A'.repeat(150_000)}`).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
+});
+
+test('guard: redacts 1Password service account tokens without matching lookalikes', () => {
+  const token = 'ops_eyJ' + 'Ab3/'.repeat(63);
+  for (const input of [token, `Use ${token} for authentication`, `Authorization: Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['1Password service account token']);
+    assert.equal(result.text, input.replace(token, '[1Password service account token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+
+  for (const ordinary of [
+    'ops_eyJ is a service account token prefix',
+    'ops_eyJ' + 'Ab3/'.repeat(62),
+    `prefix_${token}`,
+    `${token}_suffix`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('ops_eyJ' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
+});
+
 test('guard: redacts values after quoted JSON and YAML secret keys', () => {
   for (const [input, expected] of [
     ['password: hunter2hunter2', 'password: [secret removed]'],
@@ -106,6 +153,43 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
     `_${token}`,
     `${token}f`,
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
+test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
+  const token = 'ntn_' + '12345678901' + 'Ab3'.repeat(11) + 'Cd';
+  for (const input of [token, `connect using ${token}`, `Authorization: Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Notion integration token'], input);
+    assert.equal(result.text, input.replace(token, '[Notion integration token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const ordinary of [
+    'ntn_ is the documented prefix for Notion integrations',
+    'const ntn_default_workspace_settings = 1',
+    'ntn_integration_token_env_var',
+    'ntn_create_page_with_children',
+    'files: ntn_sync-worker-configuration.yaml',
+    'ntn_' + '_'.repeat(25),
+    'ntn_' + '-'.repeat(25),
+    'ntn_' + 'a'.repeat(19),
+    'ntn_' + '1234567890' + 'A'.repeat(36),
+    'ntn_' + '12345678901' + 'A'.repeat(34),
+    'ntn_' + '12345678901' + 'A'.repeat(36),
+    'ntn_' + '12345678901' + 'A'.repeat(17) + '_' + 'A'.repeat(17),
+    'ntn_' + '12345678901' + 'A'.repeat(17) + '-' + 'A'.repeat(17),
+    `not${token}`,
+    `prefix_${token}`,
+    `-${token}`,
+    `${token}suffix`,
+    `${token}_suffix`,
+    `${token}-suffix`,
+    'notion_sample_integration_id',
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+
+  const longInput = 'ntn_' + '12345678901' + 'a'.repeat(150_000);
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect(longInput).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Notion pattern exceeded 500 ms');
 });
 
 test('guard: Sentry organization auth tokens are removed without matching near misses', () => {
@@ -176,6 +260,33 @@ test('guard: redacts Slack app-level and rotating tokens', () => {
   const longToken = `xapp-1-A02BC3DEF4G-1234567890123-${'a'.repeat(150_000)}`;
   assert.equal(inspect(longToken).text, '[Slack app-level token removed]');
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Slack pattern exceeded 500 ms');
+});
+
+test('guard: removes Discord webhook URLs before they enter shared memory', () => {
+  const path = '/webhooks/123456789012345678/' + 'aB3_-'.repeat(9);
+  for (const host of ['discord.com', 'discordapp.com']) {
+    for (const prefix of ['/api', '/api/v10']) {
+      const secret = `https://${host}${prefix}${path}`;
+      for (const input of [secret, `POST ${secret} to send`, `${secret}\nnext`]) {
+        const result = inspect(input);
+        assert.deepEqual(result.secrets, ['Discord webhook URL']);
+        assert.equal(result.text, input.replace(secret, '[Discord webhook URL removed]'));
+        assert.deepEqual(inspect(result.text).secrets, []);
+      }
+    }
+  }
+  const base = 'https://discord.com/api/webhooks/123456789012345678/';
+  for (const ordinary of [
+    'https://discord.com/api/webhooks/{id}/{token}',
+    base + 'a'.repeat(29),
+    base + 'a'.repeat(129),
+    'https://example.com/api/webhooks/123456789012345678/' + 'a'.repeat(40),
+    'https://discord.com/api/webhooks/12345/' + 'a'.repeat(40),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect(base + 'a'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Discord pattern exceeded 500 ms');
 });
 
 test('guard: Telegram bot tokens are removed without catching lookalikes', () => {
