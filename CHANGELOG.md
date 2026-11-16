@@ -21,6 +21,9 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 - **Only the agent holding a task, or a human, can tick or reopen its acceptance criteria**: `check`/`uncheck` in `WORKBOARD.md`, MCP `check_criterion` and `POST /api/tasks/:id/criteria` used to let any agent mark another agent's criteria done or reopen them; they are now refused with who holds the task (or "claim the task first"). The change also adds Inbox tests for `uncheck` and `alive`. Thanks to @jdotc1! (#48, #98)
 - **Tests for the `worktree`, `scope` and `radar` Inbox commands:** they run end to end through `WORKBOARD.md` with real git worktrees and check that another agent cannot create a task's worktree, that an edit to a file another agent holds is reported, and that `radar` names both agents of an overlapping edit. Only `checks` remains open in #48. Thanks to @jdotc1! (#48, #99)
 - **Guard redacts Sentry organization auth tokens** (`sntrys_` with a base64 JSON payload and a 43-character secret), removing the whole token in env assignments, quotes and headers while leaving bare `sntrys_` mentions, placeholders and longer or embedded lookalikes alone. Thanks to @jdotc1! (#100)
+- **Notion integration tokens are redacted:** the modern `ntn_` token shape is detected, while ordinary identifiers such as `ntn_default_workspace_settings` are left alone. Thanks to @jdotc1! (#102)
+- **Every Inbox command has a test:** `checks` through `WORKBOARD.md` is now covered, which completes the 13 commands listed in #48. Thanks to @jdotc1! (#48, #109)
+- **`serve --port` accepts plain digits only:** a value such as `0x1F` is refused with the value named, and a busy port is explained in plain words. Thanks to @17302513901yh-lang! (#72, #94)
 
 ## 0.8.2
 
