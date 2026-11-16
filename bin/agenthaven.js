@@ -112,11 +112,22 @@ switch (cmd) {
     break;
   }
   case 'serve': {
-    const port = Number(flag('port', 4777));
-    if (!Number.isInteger(port) || port < 0 || port > 65535) fail('--port must be a number from 0 to 65535');
+    const portText = String(flag('port', 4777));
+    // Only plain digits pass: Number('0x1F90') is 8080, Number('1e1') is 10,
+    // and a decimal or a leading sign would silently pick a different port.
+    if (!/^\d+$/.test(portText) || Number(portText) > 65535) {
+      fail(`--port must be a number from 0 to 65535, got "${portText}"`);
+    }
+    const port = Number(portText);
     require('../src/server').start({ port, store: store(), onError: (err, ws) => console.error(`[workboard ${ws}] ${err.message}`) })
       .then(({ url }) => console.log(`AgentHaven dashboard: ${url}  (data: ${defaultDataDir()})\nEnjoying AgentHaven? A star on GitHub helps other people find it: https://github.com/laaielichter/AgentHaven`))
-      .catch((err) => fail(err.message));
+      .catch((err) => {
+        if (err && err.code === 'EADDRINUSE') {
+          const next = port < 65535 ? port + 1 : port - 1;
+          fail(`Port ${port} is already in use. AgentHaven may already be running (open http://127.0.0.1:${port}/), or pick another port: agenthaven serve --port ${next}`);
+        }
+        fail(err.message);
+      });
     break;
   }
   case 'connect': {

@@ -127,6 +127,63 @@ test('workboard: worktree, scope and radar expose cross-agent file conflicts', (
   assert.match(wb.syncOnce(empty, emptyDir).results[0].message, /no repository set/);
 });
 
+test('workboard: checks runs configured verification and refuses missing prerequisites', async () => {
+  const { s } = setup();
+  const dir = tmp('ah-wb-checks-');
+  const file = path.join(dir, wb.BOARD);
+  wb.syncOnce(s, dir);
+  const run = (line) => {
+    fs.appendFileSync(file, `${line}\n`);
+    return wb.syncOnce(s, dir).results[0];
+  };
+  const task = s.createTask({ title: 'Verify inbox command', actor: 'you' });
+  s.claimTask(task.id, { actor: 'codex' });
+  const short = task.id.slice(5, 11);
+
+  const unconfigured = run(`codex: checks ${short}`);
+  assert.equal(unconfigured.ok, false);
+  assert.match(unconfigured.message, /no checks are configured/i);
+  assert.equal(s.getTask(task.id).receipts?.length || 0, 0);
+
+  checks.setChecks(s, { actor: 'you', checks: [{ name: 'inbox-test', command: `${node} -e "console.log('inbox-checks-ran')"` }] });
+  const unknown = run('codex: checks nonexistent');
+  assert.equal(unknown.ok, false);
+  assert.match(unknown.message, /not found|no task|unknown/i);
+  assert.equal(s.getTask(task.id).receipts?.length || 0, 0);
+
+  const started = run(`codex: checks ${short}`);
+  assert.equal(started.ok, true, started.message);
+  const receipt = s.getTask(task.id).receipts.at(-1);
+  assert.match(started.message, new RegExp(`checks running on ${receipt.sha.slice(0, 10)}`));
+  assert.match(started.message, /result comes to your inbox/i);
+  assert.equal(receipt.by, 'codex');
+  assert.equal(receipt.sha, git(s.getSettings().repo.path, 'rev-parse', 'HEAD'));
+  assert.equal(receipt.dirty, false);
+
+  for (let i = 0; i < 100 && s.getTask(task.id).receipts.at(-1).status === 'running'; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  const completed = s.getTask(task.id).receipts.at(-1);
+  assert.equal(completed.id, receipt.id);
+  assert.equal(completed.status, 'passed', JSON.stringify(completed));
+  assert.equal(completed.results[0].name, 'inbox-test');
+  assert.equal(completed.results[0].exitCode, 0);
+  assert.match(completed.results[0].tail, /inbox-checks-ran/);
+  assert.ok(s.inbox({ actor: 'codex', markRead: false }).messages.some((m) =>
+    m.kind === 'checks' && m.body.includes('Checks passed')));
+
+  const noRepo = new Store({ dataDir: tmp('ah-wb-checks-no-repo-') });
+  checks.setChecks(noRepo, { actor: 'you', checks: [{ name: 'inbox-test', command: `${node} -e "0"` }] });
+  const orphan = noRepo.createTask({ title: 'No repository', actor: 'you' });
+  const noRepoDir = tmp('ah-wb-checks-no-repo-board-');
+  wb.syncOnce(noRepo, noRepoDir);
+  fs.appendFileSync(path.join(noRepoDir, wb.BOARD), `codex: checks ${orphan.id.slice(5, 11)}\n`);
+  const refused = wb.syncOnce(noRepo, noRepoDir).results[0];
+  assert.equal(refused.ok, false);
+  assert.match(refused.message, /no repository or worktree/i);
+  assert.equal(noRepo.getTask(orphan.id).receipts?.length || 0, 0);
+});
+
 test('code: approval needs AgentHaven\'s own passing checks on the submitted commit', async () => {
   const { s } = setup();
   checks.setChecks(s, { actor: 'you', checks: [{ name: 'tests', command: `${node} -e "process.exit(require('fs').readFileSync('src/a.js','utf8').includes('bug') ? 1 : 0)"` }] });

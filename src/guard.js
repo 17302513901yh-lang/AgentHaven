@@ -32,12 +32,20 @@ const SECRET_RULES = [
   ['SendGrid key', /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}(?=[^A-Za-z0-9_-]|$)/g],
   // The encoded JSON payload is bounded; the last 43 characters are the secret.
   ['Sentry organization token', /(?<![A-Za-z0-9_])sntrys_eyJ[A-Za-z0-9+/]{16,800}={0,2}_[A-Za-z0-9+/]{43}(?![A-Za-z0-9+/=_])/g],
-  // Docker Hub personal and organization access tokens are bearer credentials.
-  ['Docker Hub access token', /(?<![A-Za-z0-9_])dckr_(?:pat|oat)_[A-Za-z0-9_-]{16,256}(?![A-Za-z0-9_-])/g],
+  // Docker Hub PATs/OATs have long random-looking bodies, unlike snake_case names.
+  // Do not cap the body length: an unusually long credential should be redacted too.
+  ['Docker Hub access token', /(?<![A-Za-z0-9_])dckr_(?:pat|oat)_(?=[A-Za-z0-9-]*[A-Z0-9])[A-Za-z0-9-]{27,}(?![A-Za-z0-9_-])/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
+  // The webhook URL itself grants unauthenticated posting access.
+  ['Discord webhook URL', /\bhttps:\/\/(?:discord|discordapp)\.com\/api(?:\/v\d{1,2})?\/webhooks\/\d{17,20}\/[A-Za-z0-9_-]{30,128}(?![A-Za-z0-9_-])/g],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
+  // Match the documented 1Password service-account prefix and long base64 payload.
+  // Bound the payload to avoid scanning arbitrarily long strings on shared boards.
+  ['1Password service account token', /(?<![A-Za-z0-9_])ops_eyJ[A-Za-z0-9+/]{250,4096}={0,3}(?![A-Za-z0-9_+/=])/g],
+  // Cloudflare uses 40 alphanumeric characters and an eight-digit hex checksum.
+  ['Cloudflare API credential', /(?<![A-Za-z0-9_-])(?:cfk|cfut|cfat)_[A-Za-z0-9]{40}[0-9a-fA-F]{8}(?![A-Za-z0-9_-])/g],
   ['Linear API key', /(?<![A-Za-z0-9_])lin_api_[A-Za-z0-9]{40}(?![A-Za-z0-9_])/g],
   ['DigitalOcean token', /(?<![A-Za-z0-9_])(?:dop|doo|dor)_v1_[0-9a-f]{64}(?![A-Za-z0-9_])/g],
   ['Shopify token', /(?<![A-Za-z0-9_])(?:shpat|shpca|shppa|shpss)_[0-9a-fA-F]{32}(?![A-Za-z0-9_])/g],
@@ -51,6 +59,8 @@ const SECRET_RULES = [
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
+  // Use the scanner-observed token shape, not a broad prefix that eats identifiers.
+  ['Notion integration token', /(?<![A-Za-z0-9_-])ntn_[0-9]{11}[A-Za-z0-9]{35}(?![A-Za-z0-9_-])/g],
   // PyPI macaroons use pypi- followed by at least 85 base64url characters.
   ['PyPI token', /(?<![A-Za-z0-9_-])pypi-[A-Za-z0-9_-]{85,}(?![A-Za-z0-9_-])/g],
   ['JWT', /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g],
