@@ -84,7 +84,9 @@ test('CLI prints one line for mistakes a person can fix, and a stack for real bu
     [['status', '--workspace', '../evil'], /invalid workspace name/],
     [['connect', '--off', 'nope'], /unknown client nope/],
     [['mcp', '--tools', 'bogus'], /Unknown tool profile: bogus/],
-    [['serve', '--port', 'abc'], /--port must be a number from 0 to 65535/],
+    [['serve', '--port', 'abc'], /--port must be a number from 0 to 65535, got "abc"/],
+    [['serve', '--port', '99999'], /--port must be a number from 0 to 65535, got "99999"/],
+    [['serve', '--port', '0x1F90'], /--port must be a number from 0 to 65535, got "0x1F90"/],
   ];
   for (const [args, message] of cases) {
     const label = args.join(' ');
@@ -105,6 +107,39 @@ test('CLI prints one line for mistakes a person can fix, and a stack for real bu
   assert.equal(debug.status, 1);
   assert.match(debug.stderr, /ValidationError: no repository set/);
   assert.match(debug.stderr, /\bat /, 'AGENTHAVEN_DEBUG=1 shows the stack for a fixable error too');
+});
+
+test('serve: a port already in use gets a plain-language hint, and hex is refused', async () => {
+  const cli = path.join(__dirname, '..', 'bin', 'agenthaven.js');
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-serve-port-'));
+  const env = { ...process.env, AGENTHAVEN_HOME: home, AGENTHAVEN_WORKSPACE: 'default' };
+  const run = (port) => spawnSync(process.execPath, [cli, 'serve', '--port', String(port)], {
+    cwd: os.tmpdir(), encoding: 'utf8', env, timeout: 20_000,
+  });
+
+  // Hold a real free port, then ask the CLI to serve on exactly that port.
+  const { server, url } = await start({ port: 0, store: tmpStore() });
+  const busy = Number(new URL(url).port);
+  try {
+    const r = run(busy);
+    assert.equal(r.status, 1, `busy port ${busy}: exit 1`);
+    assert.equal(r.stdout, '', 'nothing on stdout for a busy port');
+    assert.match(r.stderr, new RegExp(`Port ${busy} is already in use`), 'names the port');
+    assert.match(r.stderr, /already be running/, 'explains the likely cause');
+    assert.match(r.stderr, /pick another port: agenthaven serve --port /, 'suggests a way out');
+    assert.doesNotMatch(r.stderr, /EADDRINUSE|\bat /, 'no raw Node message, no stack');
+    assert.equal(r.stderr.trimEnd().split('\n').length, 1, 'one line on stderr');
+
+    // The forms Number() would silently coerce are refused, quoting the value.
+    for (const bad of ['0x1F90', '1e1', '1.5', '-1']) {
+      const h = run(bad);
+      assert.equal(h.status, 1, `${bad}: exit 1`);
+      assert.match(h.stderr, new RegExp(`got "${bad.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`),
+        `${bad}: the message quotes what was typed`);
+    }
+  } finally {
+    server.close();
+  }
 });
 
 test('CLI connect --off requires a client before changing configuration', () => {
