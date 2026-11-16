@@ -108,6 +108,28 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: Slack incoming webhook URLs are redacted without masking lookalikes', () => {
+  for (const host of ['hooks.slack.com', 'hooks.slack-gov.com']) {
+    const webhook = `https://${host}/services/T00000000/B00000000/${'X'.repeat(24)}`;
+    for (const input of [webhook, `send to ${webhook} now`, `${webhook}?thread_ts=1`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Slack incoming webhook URL']);
+      assert.equal(result.text, input.replace(webhook, '[Slack incoming webhook URL removed]'));
+      assert.deepEqual(inspect(result.text).secrets, []);
+    }
+  }
+
+  const webhook = `https://hooks.slack.com/services/T00000000/B00000000/${'X'.repeat(24)}`;
+  for (const lookalike of [
+    webhook.replace('hooks.slack.com/', 'hooks.slack.com.attacker.example/'),
+    webhook.replace('T00000000/', 'T0000000/'),
+    webhook.slice(0, -1),
+    `prefix_${webhook}`,
+    `${webhook}_extra`,
+    webhook.slice(0, -24) + 'X'.repeat(100_000),
+  ]) assert.deepEqual(inspect(lookalike).secrets, [], lookalike.slice(0, 90));
+});
+
 test('guard: Sentry organization auth tokens are removed without matching near misses', () => {
   const payload = 'eyJpYXQiOi' + 'A1b2'.repeat(12) + '==';
   const secret = 'bC3/'.repeat(10) + 'x+y';
