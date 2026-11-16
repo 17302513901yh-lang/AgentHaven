@@ -46,6 +46,7 @@ const SECRET_RULES = [
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
   ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
+  ['Slack incoming webhook URL', /(?<![A-Za-z0-9._-])https:\/\/hooks\.(?:slack|slack-gov)\.com\/services\/[TE][A-Z0-9]{8,20}\/B[A-Z0-9]{8,20}\/[A-Za-z0-9]{24,128}(?![A-Za-z0-9_-])/gi],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
