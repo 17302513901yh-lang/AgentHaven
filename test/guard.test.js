@@ -274,6 +274,17 @@ test('guard: Docker Hub access tokens are removed without catching ordinary name
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Docker token pattern exceeded 500 ms');
 });
 
+test('guard: Docker Hub lowercase kebab-case identifiers with digits stay unchanged', () => {
+  for (const ordinary of [
+    'see dckr_pat_rotate-ci-token-for-release-2024 here',
+    'see dckr_pat_docker-hub-login-helper-script-v2 here',
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary);
+  }
+});
+
 test('guard: removes Discord webhook URLs before they enter shared memory', () => {
   const path = '/webhooks/123456789012345678/' + 'aB3_-'.repeat(9);
   for (const host of ['discord.com', 'discordapp.com']) {

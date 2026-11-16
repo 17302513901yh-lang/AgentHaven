@@ -32,9 +32,9 @@ const SECRET_RULES = [
   ['SendGrid key', /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}(?=[^A-Za-z0-9_-]|$)/g],
   // The encoded JSON payload is bounded; the last 43 characters are the secret.
   ['Sentry organization token', /(?<![A-Za-z0-9_])sntrys_eyJ[A-Za-z0-9+/]{16,800}={0,2}_[A-Za-z0-9+/]{43}(?![A-Za-z0-9+/=_])/g],
-  // Docker Hub PATs/OATs have long random-looking bodies, unlike snake_case names.
+  // Docker Hub PATs/OATs have long mixed-case bodies, unlike snake_case or kebab-case names.
   // Do not cap the body length: an unusually long credential should be redacted too.
-  ['Docker Hub access token', /(?<![A-Za-z0-9_])dckr_(?:pat|oat)_(?=[A-Za-z0-9-]*[A-Z0-9])[A-Za-z0-9-]{27,}(?![A-Za-z0-9_-])/g],
+  ['Docker Hub access token', /(?<![A-Za-z0-9_])dckr_(?:pat|oat)_(?=[A-Za-z0-9-]*[A-Z])[A-Za-z0-9-]{27,}(?![A-Za-z0-9_-])/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
   // The webhook URL itself grants unauthenticated posting access.
