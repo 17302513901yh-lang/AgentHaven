@@ -155,6 +155,25 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: redacts Grafana service account tokens without masking lookalikes', () => {
+  const token = 'glsa_' + 'Ab3D'.repeat(8) + '_a1b2c3d4';
+  for (const input of [token, `use ${token} for Grafana`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Grafana service account token']);
+    assert.equal(result.text, input.replace(token, '[Grafana service account token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+
+  for (const lookalike of [
+    'glsa_' + 'A'.repeat(31) + '_a1b2c3d4',
+    'glsa_' + 'A'.repeat(33) + '_a1b2c3d4',
+    'glsa_' + 'A'.repeat(32) + '_xyz12345',
+    `prefix_${token}`,
+    `${token}_extra`,
+    'glsa_' + 'A'.repeat(100_000) + '_a1b2c3d4',
+  ]) assert.deepEqual(inspect(lookalike).secrets, [], lookalike.slice(0, 80));
+});
+
 test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
   const token = 'ntn_' + '12345678901' + 'Ab3'.repeat(11) + 'Cd';
   for (const input of [token, `connect using ${token}`, `Authorization: Bearer ${token}`]) {
@@ -231,6 +250,10 @@ test('guard: masks Supabase secret keys but never publishable keys', () => {
     assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
   }
 
+  // Uppercase at the final checksum position must still qualify as a secret.
+  const checksumOnlyUppercase = 'sb_secret_' + 'a'.repeat(22) + '_' + 'b'.repeat(7) + 'C';
+  assert.deepEqual(inspect(checksumOnlyUppercase).secrets, ['Supabase secret key']);
+
   for (const ordinary of [
     `sb_publishable_${random}_${checksum}`,
     `sb_secret_${random.slice(1)}_${checksum}`,
@@ -240,11 +263,40 @@ test('guard: masks Supabase secret keys but never publishable keys', () => {
     `prefix${token}`,
     `_${token}`,
     `${token}_suffix`,
-  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+    'see ' + 'sb_secret_' + 'rotate_backend_service' + '_keys_now' + ' here',
+    'sb_secret_' + 'a'.repeat(22) + '_' + 'b'.repeat(8),
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary, 'ordinary text must not be redacted');
+  }
 
   const started = process.hrtime.bigint();
   assert.deepEqual(inspect('sb_secret_' + 'A'.repeat(150_000)).secrets, []);
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Supabase pattern exceeded 500 ms');
+});
+
+test('guard: redacts Stripe webhook signing secrets without catching lookalikes', () => {
+  const token = 'whsec_' + 'aB3cD4eF'.repeat(4);
+  for (const input of [token, `STRIPE_WEBHOOK_SECRET=${token}`, `verify using ${token}.`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Stripe webhook secret']);
+    assert.equal(result.text, input.replace(token, '[Stripe webhook secret removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+  for (const ordinary of [
+    'whsec_ is the Stripe webhook signing secret prefix',
+    'whsec_' + 'a'.repeat(19),
+    'whsec_' + 'a'.repeat(129),
+    `prefix${token}`,
+    `_${token}`,
+    `${token}_suffix`,
+    'pk_live_' + 'a'.repeat(32),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('whsec_' + 'a'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Stripe pattern exceeded 500 ms');
 });
 
 test('guard: removes Discord webhook URLs before they enter shared memory', () => {
