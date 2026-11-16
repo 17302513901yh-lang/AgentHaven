@@ -5,6 +5,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard redacts Cloudflare's prefixed API credentials** (`cfk_`, `cfut_` and `cfat_` with the 40-character body and 8-character hex checksum), without masking near misses or embedded identifiers. Thanks to @jdotc1! (#110)
 - **Guard detects instructions disguised with soft hyphens and word-internal invisible joiners**, while preserving ordinary emoji, text, and script joiners in stored notes. Thanks to @jdotc1! (#77, #89)
 - **Guard removes Telegram bot tokens** (8–10 digits, a colon and 35 characters), alone, after `TELEGRAM_BOT_TOKEN=` or `BOT_TOKEN=`, and inside an `api.telegram.org/bot<token>/` URL, while leaving times, `host:port` pairs, shorter tails and shorter ids alone. Thanks to @IG-ABHINAV! (#76)
 - **Guard redacts Linear personal API keys** with the provider's `lin_api_` prefix and expected 40-character token body, without masking shorter or embedded identifiers. Thanks to @jdotc1! (#92)
@@ -21,6 +22,11 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 - **Only the agent holding a task, or a human, can tick or reopen its acceptance criteria**: `check`/`uncheck` in `WORKBOARD.md`, MCP `check_criterion` and `POST /api/tasks/:id/criteria` used to let any agent mark another agent's criteria done or reopen them; they are now refused with who holds the task (or "claim the task first"). The change also adds Inbox tests for `uncheck` and `alive`. Thanks to @jdotc1! (#48, #98)
 - **Tests for the `worktree`, `scope` and `radar` Inbox commands:** they run end to end through `WORKBOARD.md` with real git worktrees and check that another agent cannot create a task's worktree, that an edit to a file another agent holds is reported, and that `radar` names both agents of an overlapping edit. Only `checks` remains open in #48. Thanks to @jdotc1! (#48, #99)
 - **Guard redacts Sentry organization auth tokens** (`sntrys_` with a base64 JSON payload and a 43-character secret), removing the whole token in env assignments, quotes and headers while leaving bare `sntrys_` mentions, placeholders and longer or embedded lookalikes alone. Thanks to @jdotc1! (#100)
+- **Notion integration tokens are redacted:** the modern `ntn_` token shape is detected, while ordinary identifiers such as `ntn_default_workspace_settings` are left alone. Thanks to @jdotc1! (#102)
+- **Guard redacts Discord webhook URLs** (`discord.com` and `discordapp.com`, with or without an API version, a numeric webhook id and the token), while leaving docs links, placeholders, short tokens and other hosts alone. Thanks to @jdotc1! (#106)
+- **Guard redacts 1Password service account tokens** (`ops_eyJ` followed by the long base64 payload), in env assignments and headers, without touching short `ops_` fragments or snake_case names. Thanks to @jdotc1! (#118)
+- **Every Inbox command has a test:** `checks` through `WORKBOARD.md` is now covered, which completes the 13 commands listed in #48. Thanks to @jdotc1! (#48, #109)
+- **`serve --port` accepts plain digits only:** a value such as `0x1F` is refused with the value named, and a busy port is explained in plain words. Thanks to @17302513901yh-lang! (#72, #94)
 
 ## 0.8.2
 
