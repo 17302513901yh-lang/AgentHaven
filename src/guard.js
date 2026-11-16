@@ -24,6 +24,12 @@ function isDiscordBotToken(token) {
   return /^\d{17,20}$/.test(id) && Buffer.from(id).toString('base64url') === encodedId;
 }
 
+// PostHog-generated credentials are random base57 strings, not prose. Avoid
+// altering ordinary lowercase identifiers even if they are unusually long.
+function isPostHogPrivateToken(token) {
+  return /[2-9A-HJ-NP-Z]/.test(token.slice(4));
+}
+
 const SECRET_RULES = [
   ['private key', /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z ]+ )?PRIVATE KEY-----|$)/g],
   ['Anthropic key', /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
@@ -47,8 +53,10 @@ const SECRET_RULES = [
   ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
-  // PostHog's private API tokens use these prefixes; phc_ project keys are public.
-  ['PostHog private token', /(?<![A-Za-z0-9_-])(?:phx|phs|pha|phr)_[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])/g],
+  // PostHog generates base57 bodies: 48 chars for phx_/phs_, 44 for pha_/phr_.
+  // No upper bound: an oversized credential-like string must not be left exposed.
+  // phc_ project keys are public and deliberately excluded.
+  ['PostHog private token', /(?<![A-Za-z0-9_-])(?:(?:phx|phs)_[2-9A-HJ-NP-Za-km-z]{48,}|(?:pha|phr)_[2-9A-HJ-NP-Za-km-z]{44,})(?![A-Za-z0-9_-])/g, isPostHogPrivateToken],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
   // PyPI macaroons use pypi- followed by at least 85 base64url characters.
