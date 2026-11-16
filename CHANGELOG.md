@@ -5,6 +5,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard redacts Cloudflare's prefixed API credentials** (`cfk_`, `cfut_` and `cfat_` with the 40-character body and 8-character hex checksum), without masking near misses or embedded identifiers. Thanks to @jdotc1! (#110)
 - **Guard detects instructions disguised with soft hyphens and word-internal invisible joiners**, while preserving ordinary emoji, text, and script joiners in stored notes. Thanks to @jdotc1! (#77, #89)
 - **Guard removes Telegram bot tokens** (8–10 digits, a colon and 35 characters), alone, after `TELEGRAM_BOT_TOKEN=` or `BOT_TOKEN=`, and inside an `api.telegram.org/bot<token>/` URL, while leaving times, `host:port` pairs, shorter tails and shorter ids alone. Thanks to @IG-ABHINAV! (#76)
 - **Guard redacts Linear personal API keys** with the provider's `lin_api_` prefix and expected 40-character token body, without masking shorter or embedded identifiers. Thanks to @jdotc1! (#92)
