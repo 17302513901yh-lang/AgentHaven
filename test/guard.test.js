@@ -30,12 +30,23 @@ test('guard: Vault service, batch and recovery tokens are redacted', () => {
     'hvs.' + 'a'.repeat(23),
     'hvt.' + 'a'.repeat(32),
     `prefix_${valid}`,
-    `${valid}${'B'.repeat(130)}`,
-    'hvs.' + 'a'.repeat(129),
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 
+  for (const token of [
+    `${valid}${'B'.repeat(130)}`,
+    'hvs.' + 'a'.repeat(129),
+    'hvb.AAAAAQ' + 'Jgx-DgqsG_NorpoOR7h'.repeat(11),
+  ]) {
+    const scanned = inspect(`Vault: ${token} ready`);
+    assert.deepEqual(scanned.secrets, ['HashiCorp Vault token']);
+    assert.equal(scanned.text, 'Vault: [HashiCorp Vault token removed] ready', 'must redact the entire token');
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'must be idempotent');
+  }
+
   const start = process.hrtime.bigint();
-  assert.deepEqual(inspect('hvs.' + 'A'.repeat(150_000)).secrets, []);
+  const longToken = inspect('hvs.' + 'A'.repeat(150_000));
+  assert.deepEqual(longToken.secrets, ['HashiCorp Vault token']);
+  assert.equal(longToken.text, '[HashiCorp Vault token removed]');
   assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500, 'Vault pattern exceeded 500 ms');
 });
 
