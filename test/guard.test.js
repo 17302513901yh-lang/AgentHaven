@@ -155,6 +155,25 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: redacts Grafana service account tokens without masking lookalikes', () => {
+  const token = 'glsa_' + 'Ab3D'.repeat(8) + '_a1b2c3d4';
+  for (const input of [token, `use ${token} for Grafana`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Grafana service account token']);
+    assert.equal(result.text, input.replace(token, '[Grafana service account token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+
+  for (const lookalike of [
+    'glsa_' + 'A'.repeat(31) + '_a1b2c3d4',
+    'glsa_' + 'A'.repeat(33) + '_a1b2c3d4',
+    'glsa_' + 'A'.repeat(32) + '_xyz12345',
+    `prefix_${token}`,
+    `${token}_extra`,
+    'glsa_' + 'A'.repeat(100_000) + '_a1b2c3d4',
+  ]) assert.deepEqual(inspect(lookalike).secrets, [], lookalike.slice(0, 80));
+});
+
 test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
   const token = 'ntn_' + '12345678901' + 'Ab3'.repeat(11) + 'Cd';
   for (const input of [token, `connect using ${token}`, `Authorization: Bearer ${token}`]) {
