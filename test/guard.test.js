@@ -78,6 +78,27 @@ test('guard: redacts Cloudflare API credentials with strict shape and boundaries
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
 });
 
+test('guard: redacts 1Password service account tokens without matching lookalikes', () => {
+  const token = 'ops_eyJ' + 'Ab3/'.repeat(63);
+  for (const input of [token, `Use ${token} for authentication`, `Authorization: Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['1Password service account token']);
+    assert.equal(result.text, input.replace(token, '[1Password service account token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+
+  for (const ordinary of [
+    'ops_eyJ is a service account token prefix',
+    'ops_eyJ' + 'Ab3/'.repeat(62),
+    `prefix_${token}`,
+    `${token}_suffix`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('ops_eyJ' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
+});
+
 test('guard: redacts values after quoted JSON and YAML secret keys', () => {
   for (const [input, expected] of [
     ['password: hunter2hunter2', 'password: [secret removed]'],
