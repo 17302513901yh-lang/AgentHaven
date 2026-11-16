@@ -54,6 +54,8 @@ const SECRET_RULES = [
   ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
+  // Webhook endpoint signing secrets are separate from Stripe API keys.
+  ['Stripe webhook secret', /(?<![A-Za-z0-9_])whsec_[A-Za-z0-9]{20,128}(?![A-Za-z0-9_])/g],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
   // Use the scanner-observed token shape, not a broad prefix that eats identifiers.
