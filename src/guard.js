@@ -49,6 +49,8 @@ const SECRET_RULES = [
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
+  // Use the scanner-observed token shape, not a broad prefix that eats identifiers.
+  ['Notion integration token', /(?<![A-Za-z0-9_-])ntn_[0-9]{11}[A-Za-z0-9]{35}(?![A-Za-z0-9_-])/g],
   // PyPI macaroons use pypi- followed by at least 85 base64url characters.
   ['PyPI token', /(?<![A-Za-z0-9_-])pypi-[A-Za-z0-9_-]{85,}(?![A-Za-z0-9_-])/g],
   ['JWT', /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g],

@@ -108,6 +108,43 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 });
 
+test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
+  const token = 'ntn_' + '12345678901' + 'Ab3'.repeat(11) + 'Cd';
+  for (const input of [token, `connect using ${token}`, `Authorization: Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Notion integration token'], input);
+    assert.equal(result.text, input.replace(token, '[Notion integration token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const ordinary of [
+    'ntn_ is the documented prefix for Notion integrations',
+    'const ntn_default_workspace_settings = 1',
+    'ntn_integration_token_env_var',
+    'ntn_create_page_with_children',
+    'files: ntn_sync-worker-configuration.yaml',
+    'ntn_' + '_'.repeat(25),
+    'ntn_' + '-'.repeat(25),
+    'ntn_' + 'a'.repeat(19),
+    'ntn_' + '1234567890' + 'A'.repeat(36),
+    'ntn_' + '12345678901' + 'A'.repeat(34),
+    'ntn_' + '12345678901' + 'A'.repeat(36),
+    'ntn_' + '12345678901' + 'A'.repeat(17) + '_' + 'A'.repeat(17),
+    'ntn_' + '12345678901' + 'A'.repeat(17) + '-' + 'A'.repeat(17),
+    `not${token}`,
+    `prefix_${token}`,
+    `-${token}`,
+    `${token}suffix`,
+    `${token}_suffix`,
+    `${token}-suffix`,
+    'notion_sample_integration_id',
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+
+  const longInput = 'ntn_' + '12345678901' + 'a'.repeat(150_000);
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect(longInput).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Notion pattern exceeded 500 ms');
+});
+
 test('guard: Sentry organization auth tokens are removed without matching near misses', () => {
   const payload = 'eyJpYXQiOi' + 'A1b2'.repeat(12) + '==';
   const secret = 'bC3/'.repeat(10) + 'x+y';
