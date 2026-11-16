@@ -29,6 +29,8 @@ const SECRET_RULES = [
   ['Anthropic key', /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
   ['OpenAI key', /\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}/g],
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
+  // Vault 1.10+ distinguishes service, batch and recovery bearer tokens.
+  ['HashiCorp Vault token', /(?<![A-Za-z0-9_-])hv[sbr]\.[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
   ['SendGrid key', /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}(?=[^A-Za-z0-9_-]|$)/g],
   // The encoded JSON payload is bounded; the last 43 characters are the secret.
   ['Sentry organization token', /(?<![A-Za-z0-9_])sntrys_eyJ[A-Za-z0-9+/]{16,800}={0,2}_[A-Za-z0-9+/]{43}(?![A-Za-z0-9+/=_])/g],

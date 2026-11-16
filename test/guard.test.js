@@ -13,6 +13,32 @@ const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir()
 const fakeDiscordToken = (signature = 'Z'.repeat(27), id = '123456789012345678') =>
   `${Buffer.from(id).toString('base64url')}.AbC_-7.${signature}`;
 
+test('guard: Vault service, batch and recovery tokens are redacted', () => {
+  for (const prefix of ['hvs', 'hvb', 'hvr']) {
+    const token = `${prefix}.` + 'Ab3_'.repeat(8);
+    for (const input of [token, `Vault: ${token} ready`]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['HashiCorp Vault token']);
+      assert.equal(scanned.text, input.replace(token, '[HashiCorp Vault token removed]'));
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'must be idempotent');
+    }
+  }
+
+  const valid = 'hvs.' + 'Ab3_'.repeat(8);
+  for (const ordinary of [
+    'Vault tokens have a hvs. prefix',
+    'hvs.' + 'a'.repeat(23),
+    'hvt.' + 'a'.repeat(32),
+    `prefix_${valid}`,
+    `${valid}${'B'.repeat(130)}`,
+    'hvs.' + 'a'.repeat(129),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+
+  const start = process.hrtime.bigint();
+  assert.deepEqual(inspect('hvs.' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500, 'Vault pattern exceeded 500 ms');
+});
+
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
     'Anthropic key': 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123',
