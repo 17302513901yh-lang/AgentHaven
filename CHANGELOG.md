@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard redacts Stripe webhook signing secrets** (`whsec_` with a 20 to 128 character alphanumeric body), separately from Stripe API keys, without masking snake_case or kebab-case names after the prefix. Thanks to @jdotc1! (#107)
+- **Guard redacts Grafana service account tokens** (`glsa_` with the 32-character body and 8-character hex checksum), without masking near misses or embedded identifiers. Thanks to @jdotc1! (#112)
 - **Guard redacts Cloudflare's prefixed API credentials** (`cfk_`, `cfut_` and `cfat_` with the 40-character body and 8-character hex checksum), without masking near misses or embedded identifiers. Thanks to @jdotc1! (#110)
 - **Guard detects instructions disguised with soft hyphens and word-internal invisible joiners**, while preserving ordinary emoji, text, and script joiners in stored notes. Thanks to @jdotc1! (#77, #89)
 - **Guard removes Telegram bot tokens** (8–10 digits, a colon and 35 characters), alone, after `TELEGRAM_BOT_TOKEN=` or `BOT_TOKEN=`, and inside an `api.telegram.org/bot<token>/` URL, while leaving times, `host:port` pairs, shorter tails and shorter ids alone. Thanks to @IG-ABHINAV! (#76)
