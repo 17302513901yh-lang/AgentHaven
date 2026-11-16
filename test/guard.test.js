@@ -137,7 +137,7 @@ test('guard: Sentry organization auth tokens are removed without matching near m
 });
 
 test('guard: redacts Slack app-level and rotating tokens', () => {
-  const token = 'xapp-1-' + 'A12345-'.repeat(5);
+  const token = `xapp-1-A02BC3DEF4G-1234567890123-${'a1B2'.repeat(16)}`;
   const rotating = 'xoxe.' + token;
   for (const secret of [token, rotating]) {
     for (const input of [secret, `SLACK_APP_TOKEN=${secret}`, `send ${secret}.`]) {
@@ -148,16 +148,33 @@ test('guard: redacts Slack app-level and rotating tokens', () => {
     }
   }
 
+  const oversized = `xapp-1-A02BC3DEF4G-1234567890123-${'a'.repeat(300)}`;
+  for (const secret of [oversized, `xoxe.${oversized}`]) {
+    const result = inspect(`send ${secret} now`);
+    assert.equal(result.text, 'send [Slack app-level token removed] now');
+    assert.deepEqual(result.secrets, ['Slack app-level token']);
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+
   for (const ordinary of [
     'xapp- denotes an app-level token',
-    'xapp-' + 'A'.repeat(19),
-    'xapp-' + 'A'.repeat(257),
+    'use xapp-level-token-configuration-guide here',
+    'the xapp-socket-mode-connection-handler module',
+    'npm i @slack/xapp-token-rotation-helper',
+    `xapp-1-A02BC3DEF4G-1234567890123-${'a'.repeat(31)}`,
+    `xapp-1-a02BC3DEF4G-1234567890123-${'a'.repeat(64)}`,
+    `xapp-1-A02BC3DEF4G-123456789-${'a'.repeat(64)}`,
+    `${token}_suffix`,
     `prefix${token}`,
     `_${token}`,
+    `prefix${rotating}`,
+    `_${rotating}`,
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
 
   const started = process.hrtime.bigint();
   assert.deepEqual(inspect('xapp-' + 'A'.repeat(150_000)).secrets, []);
+  const longToken = `xapp-1-A02BC3DEF4G-1234567890123-${'a'.repeat(150_000)}`;
+  assert.equal(inspect(longToken).text, '[Slack app-level token removed]');
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Slack pattern exceeded 500 ms');
 });
 
