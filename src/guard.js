@@ -34,6 +34,8 @@ const SECRET_RULES = [
   ['Sentry organization token', /(?<![A-Za-z0-9_])sntrys_eyJ[A-Za-z0-9+/]{16,800}={0,2}_[A-Za-z0-9+/]{43}(?![A-Za-z0-9+/=_])/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
+  // The webhook URL itself grants unauthenticated posting access.
+  ['Discord webhook URL', /\bhttps:\/\/(?:discord|discordapp)\.com\/api(?:\/v\d{1,2})?\/webhooks\/\d{17,20}\/[A-Za-z0-9_-]{30,128}(?![A-Za-z0-9_-])/g],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
   // Cloudflare uses 40 alphanumeric characters and an eight-digit hex checksum.

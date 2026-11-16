@@ -199,6 +199,33 @@ test('guard: Sentry organization auth tokens are removed without matching near m
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
 });
 
+test('guard: removes Discord webhook URLs before they enter shared memory', () => {
+  const path = '/webhooks/123456789012345678/' + 'aB3_-'.repeat(9);
+  for (const host of ['discord.com', 'discordapp.com']) {
+    for (const prefix of ['/api', '/api/v10']) {
+      const secret = `https://${host}${prefix}${path}`;
+      for (const input of [secret, `POST ${secret} to send`, `${secret}\nnext`]) {
+        const result = inspect(input);
+        assert.deepEqual(result.secrets, ['Discord webhook URL']);
+        assert.equal(result.text, input.replace(secret, '[Discord webhook URL removed]'));
+        assert.deepEqual(inspect(result.text).secrets, []);
+      }
+    }
+  }
+  const base = 'https://discord.com/api/webhooks/123456789012345678/';
+  for (const ordinary of [
+    'https://discord.com/api/webhooks/{id}/{token}',
+    base + 'a'.repeat(29),
+    base + 'a'.repeat(129),
+    'https://example.com/api/webhooks/123456789012345678/' + 'a'.repeat(40),
+    'https://discord.com/api/webhooks/12345/' + 'a'.repeat(40),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect(base + 'a'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Discord pattern exceeded 500 ms');
+});
+
 test('guard: Telegram bot tokens are removed without catching lookalikes', () => {
   const token = '123456789:' + 'A'.repeat(35);
   for (const input of [
