@@ -29,6 +29,9 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 - **Guard redacts 1Password service account tokens** (`ops_eyJ` followed by the long base64 payload), in env assignments and headers, without touching short `ops_` fragments or snake_case names. Thanks to @jdotc1! (#118)
 - **Every Inbox command has a test:** `checks` through `WORKBOARD.md` is now covered, which completes the 13 commands listed in #48. Thanks to @jdotc1! (#48, #109)
 - **`serve --port` accepts plain digits only:** a value such as `0x1F` is refused with the value named, and a busy port is explained in plain words. Thanks to @17302513901yh-lang! (#72, #94)
+- **Guard redacts Supabase backend secret keys** (`sb_secret_` with the 22-character random part and 8-character checksum), while publishable keys and snake_case or kebab-case names after the prefix stay untouched. Thanks to @jdotc1! (#104)
+- **Guard redacts Slack incoming webhook URLs** on `hooks.slack.com` and GovSlack, keeping a query string after the token, while docs links, lookalike hosts and the bare `/services/` path stay untouched. Thanks to @jdotc1! (#113)
+- **Guard redacts HashiCorp Vault service, batch and recovery tokens** (`hvs.`, `hvb.` and `hvr.` with a 24-character or longer body), also very long ones, without masking lowercase identifiers after the prefix. Thanks to @jdotc1! (#114)
 
 ## 0.8.2
 
