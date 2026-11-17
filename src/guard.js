@@ -46,6 +46,7 @@ const SECRET_RULES = [
   ['Discord webhook URL', /\bhttps:\/\/(?:discord|discordapp)\.com\/api(?:\/v\d{1,2})?\/webhooks\/\d{17,20}\/[A-Za-z0-9_-]{30,128}(?![A-Za-z0-9_-])/g],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
+  ['GitLab runner authentication token', /(?<![A-Za-z0-9_-])(?:glrt|glrtr)-[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])/g],
   // Match the documented 1Password service-account prefix and long base64 payload.
   // Bound the payload to avoid scanning arbitrarily long strings on shared boards.
   ['1Password service account token', /(?<![A-Za-z0-9_])ops_eyJ[A-Za-z0-9+/]{250,4096}={0,3}(?![A-Za-z0-9_+/=])/g],
