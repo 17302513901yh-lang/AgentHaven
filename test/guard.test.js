@@ -81,33 +81,6 @@ test('guard: xAI API keys are redacted without masking ordinary text', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
 });
 
-test('guard: Tailscale API, auth, client, SCIM and webhook keys are redacted', () => {
-  // Key-shaped synthetic strings, never live credentials.
-  for (const type of ['api', 'auth', 'client', 'scim', 'webhook']) {
-    const token = `tskey-${type}-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(5)}`;
-    for (const input of [token, `Tailscale key: ${token}`, `Bearer ${token}`]) {
-      const result = inspect(input);
-      assert.deepEqual(result.secrets, ['Tailscale key']);
-      assert.equal(result.text, input.replace(token, '[Tailscale key removed]'));
-      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
-    }
-  }
-
-  const token = `tskey-api-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(5)}`;
-  for (const ordinary of [
-    'Tailscale keys begin with tskey-api-',
-    `tskey-api-${'A'.repeat(7)}-${'B'.repeat(20)}`,
-    `tskey-api-${'A'.repeat(12)}-${'B'.repeat(11)}`,
-    `tskey-unknown-${'A'.repeat(12)}-${'B'.repeat(20)}`,
-    `prefix_${token}`,
-    `${token}_suffix`,
-  ]) {
-    const result = inspect(ordinary);
-    assert.deepEqual(result.secrets, [], ordinary);
-    assert.equal(result.text, ordinary);
-  }
-});
-
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
     'Anthropic key': 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123',
@@ -308,6 +281,33 @@ test('guard: redacts Grafana service account tokens without masking lookalikes',
     `${token}_extra`,
     'glsa_' + 'A'.repeat(100_000) + '_a1b2c3d4',
   ]) assert.deepEqual(inspect(lookalike).secrets, [], lookalike.slice(0, 80));
+});
+
+test('guard: Tailscale API, auth, client, SCIM and webhook keys are redacted', () => {
+  // Key-shaped synthetic strings, never live credentials.
+  for (const type of ['api', 'auth', 'client', 'scim', 'webhook']) {
+    const token = `tskey-${type}-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(5)}`;
+    for (const input of [token, `Tailscale key: ${token}`, `Bearer ${token}`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Tailscale key']);
+      assert.equal(result.text, input.replace(token, '[Tailscale key removed]'));
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
+  }
+
+  const token = `tskey-api-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(5)}`;
+  for (const ordinary of [
+    'Tailscale keys begin with tskey-api-',
+    `tskey-api-${'A'.repeat(7)}-${'B'.repeat(20)}`,
+    `tskey-api-${'A'.repeat(12)}-${'B'.repeat(11)}`,
+    `tskey-unknown-${'A'.repeat(12)}-${'B'.repeat(20)}`,
+    `prefix_${token}`,
+    `${token}_suffix`,
+  ]) {
+    const result = inspect(ordinary);
+    assert.deepEqual(result.secrets, [], ordinary);
+    assert.equal(result.text, ordinary);
+  }
 });
 
 test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
