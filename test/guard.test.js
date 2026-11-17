@@ -81,6 +81,25 @@ test('guard: xAI API keys are redacted without masking ordinary text', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
 });
 
+test('guard: Resend API keys are redacted without masking ordinary identifiers', () => {
+  const token = 're_' + 'Ab3x'.repeat(8);
+  for (const input of [token, `Use ${token} for transactional mail`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Resend API key']);
+    assert.equal(result.text, input.replace(token, '[Resend API key removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    'Resend API keys have an re_ prefix',
+    're_' + 'A'.repeat(23),
+    're_' + 'A'.repeat(129),
+    `prefix_${token}`,
+    `not${token}`,
+    're_' + 'A'.repeat(150_000),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+});
+
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
     'Anthropic key': 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123',
