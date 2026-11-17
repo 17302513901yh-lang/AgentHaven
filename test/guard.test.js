@@ -13,6 +13,53 @@ const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir()
 const fakeDiscordToken = (signature = 'Z'.repeat(27), id = '123456789012345678') =>
   `${Buffer.from(id).toString('base64url')}.AbC_-7.${signature}`;
 
+test('guard: Vault service, batch and recovery tokens are redacted', () => {
+  for (const prefix of ['hvs', 'hvb', 'hvr']) {
+    const token = `${prefix}.` + 'Ab3_'.repeat(8);
+    for (const input of [token, `Vault: ${token} ready`]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['HashiCorp Vault token']);
+      assert.equal(scanned.text, input.replace(token, '[HashiCorp Vault token removed]'));
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'must be idempotent');
+    }
+  }
+
+  const valid = 'hvs.' + 'Ab3_'.repeat(8);
+  for (const ordinary of [
+    'Vault tokens have a hvs. prefix',
+    'hvs.' + 'a'.repeat(23),
+    'hvt.' + 'a'.repeat(32),
+    `prefix_${valid}`,
+    'see hvs.service_token_rotation_handler here',
+    'see hvs.service-token-rotation-handler-docs here',
+    'see hvb.batch_token_renewal_worker_v2 here',
+    'see hvs.vault_agent_auto_auth_sink_config here',
+    'hvs.' + 'a'.repeat(129),
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary, 'must preserve non-token identifiers');
+  }
+
+  for (const token of [
+    'hvs.' + 'a'.repeat(23) + 'Z',
+    `${valid}${'B'.repeat(130)}`,
+    'hvb.AAAAAQ' + 'Jgx-DgqsG_NorpoOR7h'.repeat(11),
+    'hvb.' + 'a'.repeat(800) + 'Z',
+  ]) {
+    const scanned = inspect(`Vault: ${token} ready`);
+    assert.deepEqual(scanned.secrets, ['HashiCorp Vault token']);
+    assert.equal(scanned.text, 'Vault: [HashiCorp Vault token removed] ready', 'must redact the entire token');
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'must be idempotent');
+  }
+
+  const start = process.hrtime.bigint();
+  const longToken = inspect('hvs.' + 'A'.repeat(150_000));
+  assert.deepEqual(longToken.secrets, ['HashiCorp Vault token']);
+  assert.equal(longToken.text, '[HashiCorp Vault token removed]');
+  assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500, 'Vault pattern exceeded 500 ms');
+});
+
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
     'Anthropic key': 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123',
