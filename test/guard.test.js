@@ -239,6 +239,43 @@ test('guard: Sentry organization auth tokens are removed without matching near m
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
 });
 
+test('guard: masks Supabase secret keys but never publishable keys', () => {
+  const random = 'aB3_'.repeat(5) + 'Q-';
+  const checksum = '7Z_4x0-a';
+  const token = `sb_secret_${random}_${checksum}`;
+  for (const input of [token, `connect ${token} now`, `apikey: ${token}`]) {
+    const scanned = inspect(input);
+    assert.deepEqual(scanned.secrets, ['Supabase secret key'], input);
+    assert.equal(scanned.text, input.replace(token, '[Supabase secret key removed]'), input);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  // Uppercase at the final checksum position must still qualify as a secret.
+  const checksumOnlyUppercase = 'sb_secret_' + 'a'.repeat(22) + '_' + 'b'.repeat(7) + 'C';
+  assert.deepEqual(inspect(checksumOnlyUppercase).secrets, ['Supabase secret key']);
+
+  for (const ordinary of [
+    `sb_publishable_${random}_${checksum}`,
+    `sb_secret_${random.slice(1)}_${checksum}`,
+    `sb_secret_${random}A_${checksum}`,
+    `sb_secret_${random}_${checksum.slice(1)}`,
+    `sb_secret_${random}_${checksum}A`,
+    `prefix${token}`,
+    `_${token}`,
+    `${token}_suffix`,
+    'see ' + 'sb_secret_' + 'rotate_backend_service' + '_keys_now' + ' here',
+    'sb_secret_' + 'a'.repeat(22) + '_' + 'b'.repeat(8),
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary, 'ordinary text must not be redacted');
+  }
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('sb_secret_' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Supabase pattern exceeded 500 ms');
+});
+
 test('guard: redacts Stripe webhook signing secrets without catching lookalikes', () => {
   const token = 'whsec_' + 'aB3cD4eF'.repeat(4);
   for (const input of [token, `STRIPE_WEBHOOK_SECRET=${token}`, `verify using ${token}.`]) {
