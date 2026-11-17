@@ -78,6 +78,25 @@ test('guard: redacts Cloudflare API credentials with strict shape and boundaries
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
 });
 
+test('guard: redacts GitLab runner authentication tokens without masking identifiers', () => {
+  for (const prefix of ['glrt', 'glrtr']) {
+    const token = `${prefix}-${'Ab3d'.repeat(8)}`;
+    for (const input of [token, `runner_token=${token}`, `run with ${token} now`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['GitLab runner authentication token'], input);
+      assert.equal(result.text, input.replace(token, '[GitLab runner authentication token removed]'));
+      assert.deepEqual(inspect(result.text).secrets, []);
+    }
+    for (const ordinary of [
+      `${prefix}-short`, `${prefix}-${'A'.repeat(19)}`,
+      `prefix_${token}`, `prefix${token}`, `${prefix}-${'A'.repeat(129)}`,
+    ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+  }
+  const start = process.hrtime.bigint();
+  assert.deepEqual(inspect(`glrt-${'A'.repeat(150_000)}`).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500);
+});
+
 test('guard: redacts 1Password service account tokens without matching lookalikes', () => {
   const token = 'ops_eyJ' + 'Ab3/'.repeat(63);
   for (const input of [token, `Use ${token} for authentication`, `Authorization: Bearer ${token}`]) {
