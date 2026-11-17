@@ -15,7 +15,7 @@
   <a href="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/laaielichter/AgentHaven/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/laaielichter/AgentHaven?include_prereleases&label=release"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <a href="https://github.com/laaielichter/AgentHaven/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/laaielichter/AgentHaven?style=flat&label=stars"></a>
+  <a href="https://github.com/laaielichter/AgentHaven/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/laaielichter/AgentHaven?style=social"></a>
   <img alt="MCP server" src="https://img.shields.io/badge/MCP-server-8A2BE2">
   <img alt="Windows and macOS" src="https://img.shields.io/badge/app-Windows%20%7C%20macOS-informational">
 </p>
@@ -310,7 +310,9 @@ Contributions are very welcome, from a typo fix to a new one-click connect.
 
 ## Support the project
 
-AgentHaven is free and made in the open. The easiest way to help is to **[star the repository](https://github.com/laaielichter/AgentHaven)** ⭐ and tell someone who runs more than one AI agent about it. Thank you!
+If AgentHaven is useful to you, a ⭐ on [GitHub](https://github.com/laaielichter/AgentHaven) helps other people find it.
+
+Thanks to everyone who has contributed: [@jdotc1](https://github.com/jdotc1), [@17302513901yh-lang](https://github.com/17302513901yh-lang), [@IG-ABHINAV](https://github.com/IG-ABHINAV) and [@Daiyuanranfeng](https://github.com/Daiyuanranfeng).
 
 <a href="https://star-history.com/#laaielichter/AgentHaven&Date"><img src="https://api.star-history.com/svg?repos=laaielichter/AgentHaven&type=Date" alt="Star history of AgentHaven" width="600"></a>
 

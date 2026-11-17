@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard redacts GitLab runner authentication tokens** (`glrt-` and `glrtr-` with a 20 to 128 character body), without masking shorter strings or identifiers that only contain the prefix. Thanks to @jdotc1! (#123)
+- **Tests for the `link`, `sync`, `unlink`, `instructions`, `board` and `config` CLI commands:** they now run the real `bin/agenthaven.js` in a temporary home and shared folder, including the usage and not-linked refusals. Thanks to @17302513901yh-lang! (#79, #122)
 - **Guard redacts Stripe webhook signing secrets** (`whsec_` with a 20 to 128 character alphanumeric body), separately from Stripe API keys, without masking snake_case or kebab-case names after the prefix. Thanks to @jdotc1! (#107)
 - **Guard redacts Grafana service account tokens** (`glsa_` with the 32-character body and 8-character hex checksum), without masking near misses or embedded identifiers. Thanks to @jdotc1! (#112)
 - **Guard redacts Cloudflare's prefixed API credentials** (`cfk_`, `cfut_` and `cfat_` with the 40-character body and 8-character hex checksum), without masking near misses or embedded identifiers. Thanks to @jdotc1! (#110)
