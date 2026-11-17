@@ -60,6 +60,27 @@ test('guard: Vault service, batch and recovery tokens are redacted', () => {
   assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500, 'Vault pattern exceeded 500 ms');
 });
 
+test('guard: xAI API keys are redacted without masking ordinary text', () => {
+  const token = 'xai-' + 'Ab3x'.repeat(9);
+  for (const input of [token, `Configure ${token} for the agent`, `Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['xAI API key']);
+    assert.equal(result.text, input.replace(token, '[xAI API key removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    'Use the xAI API key for your project',
+    'xai-' + 'a'.repeat(23),
+    'xai-' + 'a'.repeat(129),
+    'not' + token,
+    'prefix_' + token,
+    'xai-' + 'A'.repeat(128) + '_suffix',
+    'xai_' + 'A'.repeat(36),
+    'xai-' + 'A'.repeat(150_000),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+});
+
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
     'Anthropic key': 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123',
