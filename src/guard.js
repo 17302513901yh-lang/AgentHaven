@@ -31,6 +31,8 @@ const SECRET_RULES = [
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
   // xAI documents the xai- prefix; bound the opaque payload to avoid partial matches.
   ['xAI API key', /(?<![A-Za-z0-9_-])xai-[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
+  // Resend documents the re_ prefix but not a fixed key length.
+  ['Resend API key', /(?<![A-Za-z0-9_-])re_[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
   // Vault 1.10+ distinguishes service, batch and recovery bearer tokens.
   // Uppercase is a heuristic to avoid redacting ordinary lowercase identifiers,
   // not a guarantee of the token format.
