@@ -36,6 +36,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 - **Guard redacts HashiCorp Vault service, batch and recovery tokens** (`hvs.`, `hvb.` and `hvr.` with a 24-character or longer body), also very long ones, without masking lowercase identifiers after the prefix. Thanks to @jdotc1! (#114)
 - **CI runs the security regression tests on Node 20, 22 and 24:** the advertised Node 20+ range is now covered on Ubuntu, while Windows and macOS keep Node 22. Thanks to @jdotc1! (#49, #129)
 - **Guard redacts xAI API keys:** an `xai-` key with a 24 to 128 character body is removed before anything enters shared memory, messages or logs, while ordinary prose is left alone. Thanks to @jdotc1! (#130)
+- **An empty `[budget: ]` or `[budget: $]` amount in `WORKBOARD.md` is refused**: it now fails with "needs an amount in dollars" instead of creating a $0 budget that blocks the task. Thanks to @theexplorer00! (#126, #138)
 
 ## 0.8.2
 
