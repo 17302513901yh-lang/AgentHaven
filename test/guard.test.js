@@ -81,6 +81,31 @@ test('guard: xAI API keys are redacted without masking ordinary text', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
 });
 
+test('guard: Tavily API keys are redacted before reaching shared agent memory', () => {
+  const token = 'tvly-' + 'Ab3x'.repeat(10);
+  for (const input of [token, `Use ${token} for search`, `Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Tavily API key']);
+    assert.equal(result.text, input.replace(token, '[Tavily API key removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    'tvly-search-plugin',
+    'tvly-' + 'a'.repeat(31),
+    'tvly-' + 'A'.repeat(129),
+    `prefix_${token}`,
+    `prefix${token}`,
+    'tvly_' + 'A'.repeat(40),
+  ]) {
+    assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+  }
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('tvly-' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Tavily pattern exceeded 500 ms');
+});
+
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
     'Anthropic key': 'key sk-' + 'ant-api03-abcdefghijklmnopqrstuvwxyz0123',
