@@ -76,3 +76,33 @@ test('unlink stops the sharing: sync and instructions then refuse', () => {
     assert.match(refused.stderr, /is not linked to a folder; run: agenthaven link <folder>/);
   }
 });
+
+// #128: a typo in --workspace (or in AGENTHAVEN_WORKSPACE) used to print an
+// empty board and exit 0. Only the two read-only commands refuse; `default`
+// still counts as existing before any file has been written.
+test('status and board refuse an unknown workspace, default stays usable', () => {
+  const { home, share, run } = fixture();
+
+  const fresh = run('status');
+  assert.equal(fresh.status, 0);
+  assert.match(fresh.stdout, /The board is empty\./);
+
+  assert.equal(run('link', share, '--workspace', 'main').status, 0);
+  const known = run('board', '--workspace', 'main');
+  assert.equal(known.status, 0);
+  assert.ok(known.stdout.startsWith('# Workboard — main'));
+
+  for (const cmd of ['status', 'board']) {
+    const bad = run(cmd, '--workspace', 'nosuch');
+    assert.equal(bad.status, 1, `${cmd} with an unknown workspace must fail`);
+    assert.equal(bad.stdout, '');
+    assert.match(bad.stderr, /no workspace named "nosuch"; existing workspaces: default, main/);
+  }
+
+  const envBad = spawnSync(process.execPath, [CLI, 'status'], {
+    cwd: home, encoding: 'utf8',
+    env: { ...process.env, AGENTHAVEN_HOME: home, AGENTHAVEN_WORKSPACE: 'mian' },
+  });
+  assert.equal(envBad.status, 1);
+  assert.match(envBad.stderr, /no workspace named "mian"; existing workspaces: default, main/);
+});
