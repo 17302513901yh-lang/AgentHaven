@@ -83,19 +83,19 @@ test('guard: xAI API keys are redacted without masking ordinary text', () => {
 
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
-    'Anthropic key': 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123',
-    'OpenAI key': 'use sk-proj-abcdefghijklmnopqrstuvwx1234 now',
-    'Groq key': 'gsk_abcdefghijklmnopqrstuvwxyz0123456789AB',
+    'Anthropic key': 'key sk-' + 'ant-api03-abcdefghijklmnopqrstuvwxyz0123',
+    'OpenAI key': 'use sk-' + 'proj-abcdefghijklmnopqrstuvwx1234 now',
+    'Groq key': 'gsk_' + 'abcdefghijklmnopqrstuvwxyz0123456789AB',
     'SendGrid key': `SG.${'a'.repeat(22)}.${'B'.repeat(43)}`,
-    'Replicate token': 'r8_abcdefghijklmnopqrstuvwxyz0123456789AB',
+    'Replicate token': 'r8_' + 'abcdefghijklmnopqrstuvwxyz0123456789AB',
     'Discord bot token': `Bot ${fakeDiscordToken()}`,
-    'GitHub token': 'ghp_abcdefghijklmnopqrstuvwxyz0123456789',
+    'GitHub token': 'ghp_' + 'abcdefghijklmnopqrstuvwxyz0123456789',
     'Shopify token': 'shpat_' + 'a1b2c3d4'.repeat(4),
-    'AWS access key': 'AKIAIOSFODNN7EXAMPLE',
-    'Google API key': 'AIzaSyA1234567890abcdefghijklmnopqrstuv',
-    'Slack token': 'xoxb-1234567890-abcdefghij',
+    'AWS access key': 'AKIA' + 'IOSFODNN7EXAMPLE',
+    'Google API key': 'AIza' + 'SyA1234567890abcdefghijklmnopqrstuv',
+    'Slack token': 'xoxb-' + '1234567890-abcdefghij',
     'PyPI token': 'pypi-' + 'Ab3_'.repeat(22),
-    'private key': '-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----',
+    'private key': '-----' + 'BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----',
   };
   for (const [kind, text] of Object.entries(cases)) {
     const r = inspect(text);
@@ -711,14 +711,14 @@ test('guard: detects split-line overrides and context-discard commands', () => {
 
 test('guard: secrets never reach the board; humans are told', () => {
   const s = tmpStore();
-  const t = s.createTask({ title: 'Deploy', description: 'token ghp_abcdefghijklmnopqrstuvwxyz0123456789', actor: 'codex' });
+  const t = s.createTask({ title: 'Deploy', description: 'token ghp_' + 'abcdefghijklmnopqrstuvwxyz0123456789', actor: 'codex' });
   assert.equal(s.getTask(t.id).description, 'token [GitHub token removed]');
-  s.comment(t.id, { actor: 'codex', body: 'my key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123' });
-  s.addNote({ title: 'Creds', body: 'aws AKIAIOSFODNN7EXAMPLE', actor: 'gemini' });
-  s.sendMessage({ from: 'gemini', to: 'you', body: 'Groq gsk_abcdefghijklmnopqrstuvwxyz0123456789AB', actor: 'gemini' });
+  s.comment(t.id, { actor: 'codex', body: 'my key is sk-' + 'ant-api03-abcdefghijklmnopqrstuvwxyz0123' });
+  s.addNote({ title: 'Creds', body: 'aws AKIA' + 'IOSFODNN7EXAMPLE', actor: 'gemini' });
+  s.sendMessage({ from: 'gemini', to: 'you', body: 'Groq gsk_' + 'abcdefghijklmnopqrstuvwxyz0123456789AB', actor: 'gemini' });
   s.sendMessage({ from: 'codex', to: 'you', body: `Discord ${fakeDiscordToken()}`, actor: 'codex' });
   const raw = fs.readFileSync(s.file, 'utf8');
-  for (const leak of ['ghp_abcdefghij', 'sk-ant-api03', 'AKIAIOSFODNN7EXAMPLE', 'gsk_abcdefghijklmnopqrstuvwxyz', fakeDiscordToken()]) assert.ok(!raw.includes(leak), leak);
+  for (const leak of ['ghp_' + 'abcdefghij', 'sk-' + 'ant-api03', 'AKIA' + 'IOSFODNN7EXAMPLE', 'gsk_' + 'abcdefghijklmnopqrstuvwxyz', fakeDiscordToken()]) assert.ok(!raw.includes(leak), leak);
   const inbox = s.inbox({ actor: 'you' });
   assert.ok(inbox.messages.some((m) => m.kind === 'guard' && /GitHub token/.test(m.body) && /Rotate/.test(m.body)));
   assert.equal(s.guardLog().events.length, 5);
@@ -763,9 +763,9 @@ test('guard: WORKBOARD.md commands pass the guard too', () => {
   const s = tmpStore();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-gwb-'));
   wb.syncOnce(s, dir);
-  fs.appendFileSync(path.join(dir, wb.BOARD), 'aider: note Setup | export OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwx1234\n');
+  fs.appendFileSync(path.join(dir, wb.BOARD), 'aider: note Setup | export OPENAI_API_KEY=sk-' + 'proj-abcdefghijklmnopqrstuvwx1234\n');
   wb.syncOnce(s, dir);
   const text = fs.readFileSync(path.join(dir, wb.BOARD), 'utf8') + fs.readFileSync(path.join(dir, wb.LOGBOOK), 'utf8');
-  assert.ok(!text.includes('sk-proj-abcdefghij'));
+  assert.ok(!text.includes('sk-' + 'proj-abcdefghij'));
   assert.match(s.listNotes()[0].body, /\[secret removed\]|\[OpenAI key removed\]/);
 });
