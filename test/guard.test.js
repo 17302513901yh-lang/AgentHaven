@@ -910,3 +910,32 @@ test('guard: WORKBOARD.md commands pass the guard too', () => {
   assert.ok(!text.includes('sk-' + 'proj-abcdefghij'));
   assert.match(s.listNotes()[0].body, /\[secret removed\]|\[OpenAI key removed\]/);
 });
+
+test('guard: connection string password rule bounds scan time on long hyphen-heavy inputs', () => {
+  const longPassword = 'P'.repeat(300);
+  const longUser = 'U'.repeat(300);
+
+  for (const [input, expected] of [
+    ['postgres://app:s3cretpw@db:5432/x', 'postgres://app:[secret removed]@db:5432/x'],
+    ['mongodb+srv://admin:pass1234@cluster0.abc.mongodb.net/test', 'mongodb+srv://admin:[secret removed]@cluster0.abc.mongodb.net/test'],
+    ['mysql://user:pass@localhost:3306/db', 'mysql://user:[secret removed]@localhost:3306/db'],
+    ['redis://default:authsecret@127.0.0.1:6379', 'redis://default:[secret removed]@127.0.0.1:6379'],
+    [`postgres://app:${longPassword}@db:5432/x`, 'postgres://app:[secret removed]@db:5432/x'],
+    [`postgres://${longUser}:${longPassword}@db:5432/x`, `postgres://${longUser}:[secret removed]@db:5432/x`],
+  ]) {
+    const scanned = inspect(`db: ${input}`);
+    assert.deepEqual(scanned.secrets, ['connection string password']);
+    assert.equal(scanned.text, `db: ${expected}`);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const longHyphenated of ['aB-'.repeat(50000), 'a-'.repeat(75000)]) {
+    const start = process.hrtime.bigint();
+    const result = inspect(longHyphenated);
+    const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+
+    assert.deepEqual(result.secrets, []);
+    assert.equal(result.text, longHyphenated);
+    assert.ok(durationMs < 500, `connection string rule took ${durationMs.toFixed(1)} ms, expected < 500 ms`);
+  }
+});
