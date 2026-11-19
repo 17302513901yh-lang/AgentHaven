@@ -348,6 +348,71 @@ test('guard: Sentry organization auth tokens are removed without matching near m
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
 });
 
+test('guard: Docker Hub access tokens are removed without catching ordinary names', () => {
+  for (const prefix of ['dckr_pat_', 'dckr_oat_']) {
+    const token = prefix + 'aB3-xY7'.repeat(4);
+    const minimumToken = prefix + 'aB3'.repeat(9); // 27-character body
+    const overlongToken = prefix + 'aB3'.repeat(86); // 258-character body
+    const marker = '[Docker Hub access token removed]';
+    for (const [input, expected] of [
+      [token, marker],
+      [minimumToken, marker],
+      [overlongToken, marker],
+      [`docker login with ${token}`, `docker login with ${marker}`],
+      [`secret: ${token}`, `secret: ${marker}`],
+    ]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['Docker Hub access token'], input);
+      assert.equal(scanned.text, expected, input);
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+    }
+    for (const ordinary of [
+      prefix + 'aB3'.repeat(8), // shorter than 27 characters
+      prefix + 'a'.repeat(257), // no uppercase letters or digits
+      prefix + 'example_token_name',
+      prefix + 'Ab3_'.repeat(10), // underscores indicate an identifier, not a token
+      prefix + 'placeholder_for_docs',
+      prefix + 'organization_access_token',
+      `${token}_suffix`, // never redact just the prefix of an identifier
+      `prefix${token}`,
+      `_${token}`,
+    ]) {
+      const scanned = inspect(ordinary);
+      assert.deepEqual(scanned.secrets, [], ordinary.slice(0, 75));
+      assert.equal(scanned.text, ordinary);
+    }
+  }
+  for (const ordinary of [
+    'see dckr_pat_example_token_name here',
+    'dckr_pat_placeholder_for_docs',
+    'dckr_oat_organization_access_token',
+    'dckr_public_example',
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary);
+  }
+
+  const started = process.hrtime.bigint();
+  const longToken = 'dckr_pat_' + 'aB3'.repeat(50_000);
+  const scanned = inspect(longToken);
+  assert.deepEqual(scanned.secrets, ['Docker Hub access token']);
+  assert.equal(scanned.text, '[Docker Hub access token removed]');
+  assert.deepEqual(inspect('dckr_pat_' + 'a'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Docker token pattern exceeded 500 ms');
+});
+
+test('guard: Docker Hub lowercase kebab-case identifiers with digits stay unchanged', () => {
+  for (const ordinary of [
+    'see dckr_pat_rotate-ci-token-for-release-2024 here',
+    'see dckr_pat_docker-hub-login-helper-script-v2 here',
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary);
+  }
+});
+
 test('guard: masks Supabase secret keys but never publishable keys', () => {
   const random = 'aB3_'.repeat(5) + 'Q-';
   const checksum = '7Z_4x0-a';
