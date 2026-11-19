@@ -53,9 +53,23 @@ function setRepo(store, { actor, dir, base }) {
   const data = store.read();
   if (!Store.isHuman(data, actor)) throw new ConflictError('only a human sets the repository');
   if (typeof dir !== 'string' || !path.isAbsolute(dir)) throw new ValidationError('dir must be an absolute path to a git repository');
-  const top = git(dir, ['rev-parse', '--show-toplevel']);
+  // A missing working folder makes Node report ENOENT for the child process,
+  // which reads as "git is not installed". Check the folder first (#127).
+  if (!fs.existsSync(dir) || !fs.statSync(dir).isDirectory()) throw new ValidationError(`folder not found: ${dir}`);
+  let top;
+  try {
+    top = git(dir, ['rev-parse', '--show-toplevel']);
+  } catch (err) {
+    if (/not a git repository/i.test(err.message || '')) throw new ValidationError(`not a git repository: ${dir}`);
+    throw err;
+  }
   const branch = base || git(top, ['symbolic-ref', '--short', 'refs/remotes/origin/HEAD'], { allowFail: true })?.replace(/^origin\//, '') || git(top, ['rev-parse', '--abbrev-ref', 'HEAD']);
-  git(top, ['rev-parse', '--verify', `${branch}^{commit}`]);
+  // An unknown --base used to surface git's "Needed a single revision". Name
+  // the branch and the repository instead; the valid paths stay unchanged.
+  if (!git(top, ['rev-parse', '--verify', `${branch}^{commit}`], { allowFail: true })) {
+    if (base) throw new ValidationError(`branch "${base}" not found in ${path.resolve(top)}`);
+    throw new ValidationError(`git rev-parse failed: cannot resolve ${branch}`);
+  }
   const repo = { path: path.resolve(top), base: branch };
   store.setSettings({ repo }, actor);
   return repo;
