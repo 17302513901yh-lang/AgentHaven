@@ -268,7 +268,11 @@ function parseNew(rest) {
     if (k === 'after') opts.dependsOn.push(...list);
     if (k === 'skills') opts.skills.push(...list);
     if (k === 'criteria') opts.criteria.push(...list);
-    if (k === 'budget') opts.budget = { costUsd: Number(value.replace(/[$\s]/g, '')) };
+    if (k === 'budget') {
+      const amount = value.replace(/[$\s]/g, '');
+      if (amount === '') throw new Error('[budget: ...] needs an amount in dollars, like [budget: $3]');
+      opts.budget = { costUsd: Number(amount) };
+    }
     return '';
   });
   const unknown = text.match(/\[([A-Za-z][A-Za-z0-9_-]*):[^\]]*\]/);

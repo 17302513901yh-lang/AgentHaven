@@ -83,12 +83,13 @@ test('guard: xAI API keys are redacted without masking ordinary text', () => {
 
 test('guard: Resend API keys are redacted without masking ordinary identifiers', () => {
   const token = 're_' + 'Ab3x'.repeat(8);
-  for (const input of [token, `Use ${token} for transactional mail`, 're_' + 'a'.repeat(23) + 'Z']) {
-    const matched = input === token ? token : input.startsWith('re_') ? input : token;
-    const result = inspect(input);
-    assert.deepEqual(result.secrets, ['Resend API key']);
-    assert.equal(result.text, input.replace(matched, '[Resend API key removed]'));
-    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  for (const candidate of [token, 're_' + 'a'.repeat(23) + 'Z']) {
+    for (const input of [candidate, `Use ${candidate} for transactional mail`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Resend API key']);
+      assert.equal(result.text, input.replace(candidate, '[Resend API key removed]'));
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
   }
 
   for (const oversized of ['re_' + 'A'.repeat(129), 're_' + 'A'.repeat(150_000)]) {
@@ -113,21 +114,48 @@ test('guard: Resend API keys are redacted without masking ordinary identifiers',
   }
 });
 
+test('guard: NVIDIA NGC API keys are redacted before reaching shared memory', () => {
+  const token = 'nvapi-' + 'Ab3x'.repeat(9);
+  for (const input of [token, `NGC credential: ${token}`, `Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['NVIDIA NGC API key']);
+    assert.equal(result.text, input.replace(token, '[NVIDIA NGC API key removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    'NGC keys use the nvapi- prefix',
+    'see nvapi-model-endpoint-configuration-reference table',
+    'the nvapi-service_account_config_reference module',
+    'nvapi-' + 'a'.repeat(23),
+    'prefix_' + token,
+    'word' + token,
+    'nvapi_' + 'A'.repeat(36),
+  ]) {
+    const result = inspect(ordinary);
+    assert.deepEqual(result.secrets, [], ordinary);
+    assert.equal(result.text, ordinary);
+  }
+
+  const oversized = 'nvapi-' + 'A'.repeat(100_000);
+  assert.equal(inspect(oversized).text, '[NVIDIA NGC API key removed]', 'redact complete oversized key');
+});
+
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
-    'Anthropic key': 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123',
-    'OpenAI key': 'use sk-proj-abcdefghijklmnopqrstuvwx1234 now',
-    'Groq key': 'gsk_abcdefghijklmnopqrstuvwxyz0123456789AB',
+    'Anthropic key': 'key sk-' + 'ant-api03-abcdefghijklmnopqrstuvwxyz0123',
+    'OpenAI key': 'use sk-' + 'proj-abcdefghijklmnopqrstuvwx1234 now',
+    'Groq key': 'gsk_' + 'abcdefghijklmnopqrstuvwxyz0123456789AB',
     'SendGrid key': `SG.${'a'.repeat(22)}.${'B'.repeat(43)}`,
-    'Replicate token': 'r8_abcdefghijklmnopqrstuvwxyz0123456789AB',
+    'Replicate token': 'r8_' + 'abcdefghijklmnopqrstuvwxyz0123456789AB',
     'Discord bot token': `Bot ${fakeDiscordToken()}`,
-    'GitHub token': 'ghp_abcdefghijklmnopqrstuvwxyz0123456789',
+    'GitHub token': 'ghp_' + 'abcdefghijklmnopqrstuvwxyz0123456789',
     'Shopify token': 'shpat_' + 'a1b2c3d4'.repeat(4),
-    'AWS access key': 'AKIAIOSFODNN7EXAMPLE',
-    'Google API key': 'AIzaSyA1234567890abcdefghijklmnopqrstuv',
-    'Slack token': 'xoxb-1234567890-abcdefghij',
+    'AWS access key': 'AKIA' + 'IOSFODNN7EXAMPLE',
+    'Google API key': 'AIza' + 'SyA1234567890abcdefghijklmnopqrstuv',
+    'Slack token': 'xoxb-' + '1234567890-abcdefghij',
     'PyPI token': 'pypi-' + 'Ab3_'.repeat(22),
-    'private key': '-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----',
+    'private key': '-----' + 'BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----',
   };
   for (const [kind, text] of Object.entries(cases)) {
     const r = inspect(text);
@@ -380,6 +408,71 @@ test('guard: Sentry organization auth tokens are removed without matching near m
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Sentry pattern exceeded 500 ms');
 });
 
+test('guard: Docker Hub access tokens are removed without catching ordinary names', () => {
+  for (const prefix of ['dckr_pat_', 'dckr_oat_']) {
+    const token = prefix + 'aB3-xY7'.repeat(4);
+    const minimumToken = prefix + 'aB3'.repeat(9); // 27-character body
+    const overlongToken = prefix + 'aB3'.repeat(86); // 258-character body
+    const marker = '[Docker Hub access token removed]';
+    for (const [input, expected] of [
+      [token, marker],
+      [minimumToken, marker],
+      [overlongToken, marker],
+      [`docker login with ${token}`, `docker login with ${marker}`],
+      [`secret: ${token}`, `secret: ${marker}`],
+    ]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['Docker Hub access token'], input);
+      assert.equal(scanned.text, expected, input);
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+    }
+    for (const ordinary of [
+      prefix + 'aB3'.repeat(8), // shorter than 27 characters
+      prefix + 'a'.repeat(257), // no uppercase letters or digits
+      prefix + 'example_token_name',
+      prefix + 'Ab3_'.repeat(10), // underscores indicate an identifier, not a token
+      prefix + 'placeholder_for_docs',
+      prefix + 'organization_access_token',
+      `${token}_suffix`, // never redact just the prefix of an identifier
+      `prefix${token}`,
+      `_${token}`,
+    ]) {
+      const scanned = inspect(ordinary);
+      assert.deepEqual(scanned.secrets, [], ordinary.slice(0, 75));
+      assert.equal(scanned.text, ordinary);
+    }
+  }
+  for (const ordinary of [
+    'see dckr_pat_example_token_name here',
+    'dckr_pat_placeholder_for_docs',
+    'dckr_oat_organization_access_token',
+    'dckr_public_example',
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary);
+  }
+
+  const started = process.hrtime.bigint();
+  const longToken = 'dckr_pat_' + 'aB3'.repeat(50_000);
+  const scanned = inspect(longToken);
+  assert.deepEqual(scanned.secrets, ['Docker Hub access token']);
+  assert.equal(scanned.text, '[Docker Hub access token removed]');
+  assert.deepEqual(inspect('dckr_pat_' + 'a'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Docker token pattern exceeded 500 ms');
+});
+
+test('guard: Docker Hub lowercase kebab-case identifiers with digits stay unchanged', () => {
+  for (const ordinary of [
+    'see dckr_pat_rotate-ci-token-for-release-2024 here',
+    'see dckr_pat_docker-hub-login-helper-script-v2 here',
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary);
+  }
+});
+
 test('guard: masks Supabase secret keys but never publishable keys', () => {
   const random = 'aB3_'.repeat(5) + 'Q-';
   const checksum = '7Z_4x0-a';
@@ -415,6 +508,34 @@ test('guard: masks Supabase secret keys but never publishable keys', () => {
   const started = process.hrtime.bigint();
   assert.deepEqual(inspect('sb_secret_' + 'A'.repeat(150_000)).secrets, []);
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Supabase pattern exceeded 500 ms');
+});
+
+test('guard: redacts Vercel API credential formats from shared memory', () => {
+  for (const prefix of ['vcp', 'vci', 'vca', 'vcr', 'vck']) {
+    const token = prefix + '_' + 'Ab3x'.repeat(12);
+    for (const input of [token, `Vercel credential: ${token}`, `Bearer ${token}`]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['Vercel API credential'], input);
+      assert.equal(scanned.text, input.replace(token, '[Vercel API credential removed]'), input);
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+    }
+  }
+});
+
+test('guard: Vercel credential near misses and long inputs stay unclassified', () => {
+  const token = 'vcp_' + 'Ab3x'.repeat(12);
+  for (const ordinary of [
+    'vcp_' + 'A'.repeat(39),
+    'vci_' + 'A'.repeat(81),
+    'vcx_' + 'Ab3x'.repeat(12),
+    'prefix_' + token,
+    'not' + token,
+    token + '_suffix',
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('vcp_' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
 });
 
 test('guard: redacts Stripe webhook signing secrets without catching lookalikes', () => {
@@ -519,6 +640,27 @@ test('guard: redacts Authorization header credentials without false positives', 
   const started = process.hrtime.bigint();
   inspect(longInput);
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'header scan exceeded 500 ms');
+});
+
+test('guard: Databricks personal access tokens are redacted', () => {
+  const token = 'dapi' + 'a1B2'.repeat(8);
+  for (const input of [token, `Databricks PAT: ${token} ready`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Databricks personal access token']);
+    assert.equal(result.text, input.replace(token, '[Databricks personal access token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const ordinary of [
+    'Databricks PATs begin with dapi',
+    'dapi' + 'a'.repeat(31),
+    'dapi' + 'a'.repeat(33),
+    'dapi' + 'z'.repeat(32),
+    'prefix_' + token,
+    token + '_suffix',
+    'dapi' + 'a'.repeat(100_000),
+  ]) {
+    assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+  }
 });
 
 test('guard: DigitalOcean tokens are removed without catching lookalikes', () => {
@@ -743,14 +885,14 @@ test('guard: detects split-line overrides and context-discard commands', () => {
 
 test('guard: secrets never reach the board; humans are told', () => {
   const s = tmpStore();
-  const t = s.createTask({ title: 'Deploy', description: 'token ghp_abcdefghijklmnopqrstuvwxyz0123456789', actor: 'codex' });
+  const t = s.createTask({ title: 'Deploy', description: 'token ghp_' + 'abcdefghijklmnopqrstuvwxyz0123456789', actor: 'codex' });
   assert.equal(s.getTask(t.id).description, 'token [GitHub token removed]');
-  s.comment(t.id, { actor: 'codex', body: 'my key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123' });
-  s.addNote({ title: 'Creds', body: 'aws AKIAIOSFODNN7EXAMPLE', actor: 'gemini' });
-  s.sendMessage({ from: 'gemini', to: 'you', body: 'Groq gsk_abcdefghijklmnopqrstuvwxyz0123456789AB', actor: 'gemini' });
+  s.comment(t.id, { actor: 'codex', body: 'my key is sk-' + 'ant-api03-abcdefghijklmnopqrstuvwxyz0123' });
+  s.addNote({ title: 'Creds', body: 'aws AKIA' + 'IOSFODNN7EXAMPLE', actor: 'gemini' });
+  s.sendMessage({ from: 'gemini', to: 'you', body: 'Groq gsk_' + 'abcdefghijklmnopqrstuvwxyz0123456789AB', actor: 'gemini' });
   s.sendMessage({ from: 'codex', to: 'you', body: `Discord ${fakeDiscordToken()}`, actor: 'codex' });
   const raw = fs.readFileSync(s.file, 'utf8');
-  for (const leak of ['ghp_abcdefghij', 'sk-ant-api03', 'AKIAIOSFODNN7EXAMPLE', 'gsk_abcdefghijklmnopqrstuvwxyz', fakeDiscordToken()]) assert.ok(!raw.includes(leak), leak);
+  for (const leak of ['ghp_' + 'abcdefghij', 'sk-' + 'ant-api03', 'AKIA' + 'IOSFODNN7EXAMPLE', 'gsk_' + 'abcdefghijklmnopqrstuvwxyz', fakeDiscordToken()]) assert.ok(!raw.includes(leak), leak);
   const inbox = s.inbox({ actor: 'you' });
   assert.ok(inbox.messages.some((m) => m.kind === 'guard' && /GitHub token/.test(m.body) && /Rotate/.test(m.body)));
   assert.equal(s.guardLog().events.length, 5);
@@ -795,9 +937,38 @@ test('guard: WORKBOARD.md commands pass the guard too', () => {
   const s = tmpStore();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-gwb-'));
   wb.syncOnce(s, dir);
-  fs.appendFileSync(path.join(dir, wb.BOARD), 'aider: note Setup | export OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwx1234\n');
+  fs.appendFileSync(path.join(dir, wb.BOARD), 'aider: note Setup | export OPENAI_API_KEY=sk-' + 'proj-abcdefghijklmnopqrstuvwx1234\n');
   wb.syncOnce(s, dir);
   const text = fs.readFileSync(path.join(dir, wb.BOARD), 'utf8') + fs.readFileSync(path.join(dir, wb.LOGBOOK), 'utf8');
-  assert.ok(!text.includes('sk-proj-abcdefghij'));
+  assert.ok(!text.includes('sk-' + 'proj-abcdefghij'));
   assert.match(s.listNotes()[0].body, /\[secret removed\]|\[OpenAI key removed\]/);
+});
+
+test('guard: connection string password rule bounds scan time on long hyphen-heavy inputs', () => {
+  const longPassword = 'P'.repeat(300);
+  const longUser = 'U'.repeat(300);
+
+  for (const [input, expected] of [
+    ['postgres://app:s3cretpw@db:5432/x', 'postgres://app:[secret removed]@db:5432/x'],
+    ['mongodb+srv://admin:pass1234@cluster0.abc.mongodb.net/test', 'mongodb+srv://admin:[secret removed]@cluster0.abc.mongodb.net/test'],
+    ['mysql://user:pass@localhost:3306/db', 'mysql://user:[secret removed]@localhost:3306/db'],
+    ['redis://default:authsecret@127.0.0.1:6379', 'redis://default:[secret removed]@127.0.0.1:6379'],
+    [`postgres://app:${longPassword}@db:5432/x`, 'postgres://app:[secret removed]@db:5432/x'],
+    [`postgres://${longUser}:${longPassword}@db:5432/x`, `postgres://${longUser}:[secret removed]@db:5432/x`],
+  ]) {
+    const scanned = inspect(`db: ${input}`);
+    assert.deepEqual(scanned.secrets, ['connection string password']);
+    assert.equal(scanned.text, `db: ${expected}`);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const longHyphenated of ['aB-'.repeat(50000), 'a-'.repeat(75000)]) {
+    const start = process.hrtime.bigint();
+    const result = inspect(longHyphenated);
+    const durationMs = Number(process.hrtime.bigint() - start) / 1e6;
+
+    assert.deepEqual(result.secrets, []);
+    assert.equal(result.text, longHyphenated);
+    assert.ok(durationMs < 500, `connection string rule took ${durationMs.toFixed(1)} ms, expected < 500 ms`);
+  }
 });

@@ -88,6 +88,14 @@ Data is stored in ${defaultDataDir()} (override with AGENTHAVEN_HOME).`;
 
 const store = () => new Store({ workspace });
 const linkedDir = (s) => s.getSettings().workboardDir || fail(`workspace "${workspace}" is not linked to a folder; run: agenthaven link <folder>`);
+// `status` and `board` only read the board. Without this check a misspelled
+// workspace looks exactly like an empty board; commands that may create a
+// workspace on purpose keep their current behaviour. `default` is always in
+// listWorkspaces(), so a fresh install still shows an empty board (#128).
+const requireKnownWorkspace = (name) => {
+  const known = Store.listWorkspaces(defaultDataDir());
+  if (!known.includes(name)) fail(`no workspace named "${name}"; existing workspaces: ${known.join(', ')}`);
+};
 
 switch (cmd) {
   case 'mcp':
@@ -206,11 +214,15 @@ switch (cmd) {
   case 'instructions':
     console.log(require('../src/workboard').agentInstructions(linkedDir(store())));
     break;
-  case 'board':
-    console.log(require('../src/workboard').renderBoard(store()));
+  case 'board': {
+    const s = store(); // validates the workspace name before anything else
+    requireKnownWorkspace(workspace);
+    console.log(require('../src/workboard').renderBoard(s));
     break;
+  }
   case 'status': {
     const s = store();
+    requireKnownWorkspace(workspace);
     const st = s.stats();
     const c = st.counts;
     const lines = [];

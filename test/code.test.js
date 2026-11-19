@@ -34,7 +34,21 @@ test('code: only a human sets the repository and the checks', () => {
   assert.throws(() => gitx.setRepo(s, { actor: 'codex', dir: repo }), /only a human/);
   s.takeLead({ actor: 'you', agent: 'lead-bot' });
   assert.throws(() => checks.setChecks(s, { actor: 'lead-bot', checks: [{ command: 'rm -rf /' }] }), /only a human/, 'not even the lead');
-  assert.throws(() => gitx.setRepo(s, { actor: 'you', dir: os.tmpdir() }), /git rev-parse failed|not a git repository/i);
+  assert.throws(() => gitx.setRepo(s, { actor: 'you', dir: os.tmpdir() }), /not a git repository: /);
+});
+
+// #127: the three common mistakes must name what is wrong, and a valid
+// repository still works both with and without an explicit base.
+test('code: setRepo names a missing folder, a non-git folder and an unknown base', () => {
+  const { repo, s } = setup();
+  const missing = path.join(os.tmpdir(), `ah-no-such-folder-${process.pid}-${Date.now()}`);
+  assert.throws(() => gitx.setRepo(s, { actor: 'you', dir: missing }),
+    (err) => err.code === 'INVALID' && err.message === `folder not found: ${missing}`);
+  assert.throws(() => gitx.setRepo(s, { actor: 'you', dir: os.tmpdir() }), /not a git repository: /);
+  assert.throws(() => gitx.setRepo(s, { actor: 'you', dir: repo, base: 'nosuch' }),
+    (err) => err.code === 'INVALID' && /branch "nosuch" not found in /.test(err.message));
+  assert.deepEqual(gitx.setRepo(s, { actor: 'you', dir: repo }), { path: repo, base: 'main' });
+  assert.deepEqual(gitx.setRepo(s, { actor: 'you', dir: repo, base: 'main' }), { path: repo, base: 'main' });
 });
 
 test('code: worktree per task, scope check flags edits outside the claim and on others\' files', () => {
