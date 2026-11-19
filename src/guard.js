@@ -44,6 +44,9 @@ const SECRET_RULES = [
   // Supabase keys have a 22-character random part and 8-character checksum.
   // At least one uppercase letter avoids matching ordinary snake_case names.
   ['Supabase secret key', /(?<![A-Za-z0-9_])sb_secret_(?=[A-Za-z0-9_-]{0,30}[A-Z])[A-Za-z0-9_-]{22}_[A-Za-z0-9_-]{8}(?![A-Za-z0-9_-])/g],
+  // Vercel's five credential types have distinct prefixes; the opaque payload
+  // bound is a detection heuristic, not a fixed-format token validator.
+  ['Vercel API credential', /(?<![A-Za-z0-9_-])vc[piark]_[A-Za-z0-9]{40,80}(?![A-Za-z0-9_-])/g],
   ['Grafana service account token', /(?<![A-Za-z0-9_-])glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}(?![A-Za-z0-9_-])/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
