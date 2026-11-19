@@ -13,6 +13,24 @@ const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir()
 const fakeDiscordToken = (signature = 'Z'.repeat(27), id = '123456789012345678') =>
   `${Buffer.from(id).toString('base64url')}.AbC_-7.${signature}`;
 
+test('guard: Firecrawl API keys are fully removed without masking ordinary text', () => {
+  const token = 'fc-' + 'Ab3x'.repeat(9);
+  for (const input of [token, `Firecrawl credential: ${token} ready`]) {
+    const scanned = inspect(input);
+    assert.deepEqual(scanned.secrets, ['Firecrawl API key']);
+    assert.equal(scanned.text, input.replace(token, '[Firecrawl API key removed]'));
+    assert.deepEqual(inspect(scanned.text).secrets, []);
+  }
+  for (const ordinary of [
+    'Firecrawl keys begin with fc-',
+    'fc-' + 'A'.repeat(23),
+    'not' + token,
+    'fc-' + 'A'.repeat(129),
+  ]) {
+    assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+  }
+});
+
 test('guard: Vault service, batch and recovery tokens are redacted', () => {
   for (const prefix of ['hvs', 'hvb', 'hvr']) {
     const token = `${prefix}.` + 'Ab3_'.repeat(8);
