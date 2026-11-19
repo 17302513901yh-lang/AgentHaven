@@ -385,6 +385,34 @@ test('guard: masks Supabase secret keys but never publishable keys', () => {
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Supabase pattern exceeded 500 ms');
 });
 
+test('guard: redacts Vercel API credential formats from shared memory', () => {
+  for (const prefix of ['vcp', 'vci', 'vca', 'vcr', 'vck']) {
+    const token = prefix + '_' + 'Ab3x'.repeat(12);
+    for (const input of [token, `Vercel credential: ${token}`, `Bearer ${token}`]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['Vercel API credential'], input);
+      assert.equal(scanned.text, input.replace(token, '[Vercel API credential removed]'), input);
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+    }
+  }
+});
+
+test('guard: Vercel credential near misses and long inputs stay unclassified', () => {
+  const token = 'vcp_' + 'Ab3x'.repeat(12);
+  for (const ordinary of [
+    'vcp_' + 'A'.repeat(39),
+    'vci_' + 'A'.repeat(81),
+    'vcx_' + 'Ab3x'.repeat(12),
+    'prefix_' + token,
+    'not' + token,
+    token + '_suffix',
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('vcp_' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
+});
+
 test('guard: redacts Stripe webhook signing secrets without catching lookalikes', () => {
   const token = 'whsec_' + 'aB3cD4eF'.repeat(4);
   for (const input of [token, `STRIPE_WEBHOOK_SECRET=${token}`, `verify using ${token}.`]) {
