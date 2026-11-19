@@ -92,6 +92,8 @@ test('guard: NVIDIA NGC API keys are redacted before reaching shared memory', ()
 
   for (const ordinary of [
     'NGC keys use the nvapi- prefix',
+    'see nvapi-model-endpoint-configuration-reference table',
+    'the nvapi-service_account_config_reference module',
     'nvapi-' + 'a'.repeat(23),
     'prefix_' + token,
     'word' + token,
