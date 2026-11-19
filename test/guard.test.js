@@ -13,21 +13,89 @@ const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir()
 const fakeDiscordToken = (signature = 'Z'.repeat(27), id = '123456789012345678') =>
   `${Buffer.from(id).toString('base64url')}.AbC_-7.${signature}`;
 
+test('guard: Vault service, batch and recovery tokens are redacted', () => {
+  for (const prefix of ['hvs', 'hvb', 'hvr']) {
+    const token = `${prefix}.` + 'Ab3_'.repeat(8);
+    for (const input of [token, `Vault: ${token} ready`]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['HashiCorp Vault token']);
+      assert.equal(scanned.text, input.replace(token, '[HashiCorp Vault token removed]'));
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'must be idempotent');
+    }
+  }
+
+  const valid = 'hvs.' + 'Ab3_'.repeat(8);
+  for (const ordinary of [
+    'Vault tokens have a hvs. prefix',
+    'hvs.' + 'a'.repeat(23),
+    'hvt.' + 'a'.repeat(32),
+    `prefix_${valid}`,
+    'see hvs.service_token_rotation_handler here',
+    'see hvs.service-token-rotation-handler-docs here',
+    'see hvb.batch_token_renewal_worker_v2 here',
+    'see hvs.vault_agent_auto_auth_sink_config here',
+    'hvs.' + 'a'.repeat(129),
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary, 'must preserve non-token identifiers');
+  }
+
+  for (const token of [
+    'hvs.' + 'a'.repeat(23) + 'Z',
+    `${valid}${'B'.repeat(130)}`,
+    'hvb.AAAAAQ' + 'Jgx-DgqsG_NorpoOR7h'.repeat(11),
+    'hvb.' + 'a'.repeat(800) + 'Z',
+  ]) {
+    const scanned = inspect(`Vault: ${token} ready`);
+    assert.deepEqual(scanned.secrets, ['HashiCorp Vault token']);
+    assert.equal(scanned.text, 'Vault: [HashiCorp Vault token removed] ready', 'must redact the entire token');
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'must be idempotent');
+  }
+
+  const start = process.hrtime.bigint();
+  const longToken = inspect('hvs.' + 'A'.repeat(150_000));
+  assert.deepEqual(longToken.secrets, ['HashiCorp Vault token']);
+  assert.equal(longToken.text, '[HashiCorp Vault token removed]');
+  assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500, 'Vault pattern exceeded 500 ms');
+});
+
+test('guard: xAI API keys are redacted without masking ordinary text', () => {
+  const token = 'xai-' + 'Ab3x'.repeat(9);
+  for (const input of [token, `Configure ${token} for the agent`, `Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['xAI API key']);
+    assert.equal(result.text, input.replace(token, '[xAI API key removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    'Use the xAI API key for your project',
+    'xai-' + 'a'.repeat(23),
+    'xai-' + 'a'.repeat(129),
+    'not' + token,
+    'prefix_' + token,
+    'xai-' + 'A'.repeat(128) + '_suffix',
+    'xai_' + 'A'.repeat(36),
+    'xai-' + 'A'.repeat(150_000),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+});
+
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
-    'Anthropic key': 'key sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123',
-    'OpenAI key': 'use sk-proj-abcdefghijklmnopqrstuvwx1234 now',
-    'Groq key': 'gsk_abcdefghijklmnopqrstuvwxyz0123456789AB',
+    'Anthropic key': 'key sk-' + 'ant-api03-abcdefghijklmnopqrstuvwxyz0123',
+    'OpenAI key': 'use sk-' + 'proj-abcdefghijklmnopqrstuvwx1234 now',
+    'Groq key': 'gsk_' + 'abcdefghijklmnopqrstuvwxyz0123456789AB',
     'SendGrid key': `SG.${'a'.repeat(22)}.${'B'.repeat(43)}`,
-    'Replicate token': 'r8_abcdefghijklmnopqrstuvwxyz0123456789AB',
+    'Replicate token': 'r8_' + 'abcdefghijklmnopqrstuvwxyz0123456789AB',
     'Discord bot token': `Bot ${fakeDiscordToken()}`,
-    'GitHub token': 'ghp_abcdefghijklmnopqrstuvwxyz0123456789',
+    'GitHub token': 'ghp_' + 'abcdefghijklmnopqrstuvwxyz0123456789',
     'Shopify token': 'shpat_' + 'a1b2c3d4'.repeat(4),
-    'AWS access key': 'AKIAIOSFODNN7EXAMPLE',
-    'Google API key': 'AIzaSyA1234567890abcdefghijklmnopqrstuv',
-    'Slack token': 'xoxb-1234567890-abcdefghij',
+    'AWS access key': 'AKIA' + 'IOSFODNN7EXAMPLE',
+    'Google API key': 'AIza' + 'SyA1234567890abcdefghijklmnopqrstuv',
+    'Slack token': 'xoxb-' + '1234567890-abcdefghij',
     'PyPI token': 'pypi-' + 'Ab3_'.repeat(22),
-    'private key': '-----BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----',
+    'private key': '-----' + 'BEGIN RSA PRIVATE KEY-----\nMIIabc\n-----END RSA PRIVATE KEY-----',
   };
   for (const [kind, text] of Object.entries(cases)) {
     const r = inspect(text);
@@ -76,6 +144,25 @@ test('guard: redacts Cloudflare API credentials with strict shape and boundaries
   const started = process.hrtime.bigint();
   assert.deepEqual(inspect(`cfk_${'A'.repeat(150_000)}`).secrets, []);
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
+});
+
+test('guard: redacts GitLab runner authentication tokens without masking identifiers', () => {
+  for (const prefix of ['glrt', 'glrtr']) {
+    const token = `${prefix}-${'Ab3d'.repeat(8)}`;
+    for (const input of [token, `runner_token=${token}`, `run with ${token} now`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['GitLab runner authentication token'], input);
+      assert.equal(result.text, input.replace(token, '[GitLab runner authentication token removed]'));
+      assert.deepEqual(inspect(result.text).secrets, []);
+    }
+    for (const ordinary of [
+      `${prefix}-short`, `${prefix}-${'A'.repeat(19)}`,
+      `prefix_${token}`, `prefix${token}`, `${prefix}-${'A'.repeat(129)}`,
+    ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+  }
+  const start = process.hrtime.bigint();
+  assert.deepEqual(inspect(`glrt-${'A'.repeat(150_000)}`).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500);
 });
 
 test('guard: redacts 1Password service account tokens without matching lookalikes', () => {
@@ -153,6 +240,47 @@ test('guard: Shopify tokens are removed without catching lookalikes', () => {
     `_${token}`,
     `${token}f`,
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+});
+
+test('guard: Slack incoming webhook URLs are redacted without masking lookalikes', () => {
+  for (const host of ['hooks.slack.com', 'hooks.slack-gov.com']) {
+    const webhook = `https://${host}/services/T00000000/B00000000/${'X'.repeat(24)}`;
+    for (const input of [webhook, `send to ${webhook} now`, `${webhook}?thread_ts=1`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Slack incoming webhook URL']);
+      assert.equal(result.text, input.replace(webhook, '[Slack incoming webhook URL removed]'));
+      assert.deepEqual(inspect(result.text).secrets, []);
+    }
+  }
+
+  const webhook = `https://hooks.slack.com/services/T00000000/B00000000/${'X'.repeat(24)}`;
+  for (const lookalike of [
+    webhook.replace('hooks.slack.com/', 'hooks.slack.com.attacker.example/'),
+    webhook.replace('T00000000/', 'T0000000/'),
+    webhook.slice(0, -1),
+    `prefix_${webhook}`,
+    `${webhook}_extra`,
+    webhook.slice(0, -24) + 'X'.repeat(100_000),
+  ]) assert.deepEqual(inspect(lookalike).secrets, [], lookalike.slice(0, 90));
+});
+
+test('guard: redacts Grafana service account tokens without masking lookalikes', () => {
+  const token = 'glsa_' + 'Ab3D'.repeat(8) + '_a1b2c3d4';
+  for (const input of [token, `use ${token} for Grafana`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Grafana service account token']);
+    assert.equal(result.text, input.replace(token, '[Grafana service account token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+
+  for (const lookalike of [
+    'glsa_' + 'A'.repeat(31) + '_a1b2c3d4',
+    'glsa_' + 'A'.repeat(33) + '_a1b2c3d4',
+    'glsa_' + 'A'.repeat(32) + '_xyz12345',
+    `prefix_${token}`,
+    `${token}_extra`,
+    'glsa_' + 'A'.repeat(100_000) + '_a1b2c3d4',
+  ]) assert.deepEqual(inspect(lookalike).secrets, [], lookalike.slice(0, 80));
 });
 
 test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
@@ -260,6 +388,66 @@ test('guard: redacts Slack app-level and rotating tokens', () => {
   const longToken = `xapp-1-A02BC3DEF4G-1234567890123-${'a'.repeat(150_000)}`;
   assert.equal(inspect(longToken).text, '[Slack app-level token removed]');
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Slack pattern exceeded 500 ms');
+});
+
+test('guard: masks Supabase secret keys but never publishable keys', () => {
+  const random = 'aB3_'.repeat(5) + 'Q-';
+  const checksum = '7Z_4x0-a';
+  const token = `sb_secret_${random}_${checksum}`;
+  for (const input of [token, `connect ${token} now`, `apikey: ${token}`]) {
+    const scanned = inspect(input);
+    assert.deepEqual(scanned.secrets, ['Supabase secret key'], input);
+    assert.equal(scanned.text, input.replace(token, '[Supabase secret key removed]'), input);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  // Uppercase at the final checksum position must still qualify as a secret.
+  const checksumOnlyUppercase = 'sb_secret_' + 'a'.repeat(22) + '_' + 'b'.repeat(7) + 'C';
+  assert.deepEqual(inspect(checksumOnlyUppercase).secrets, ['Supabase secret key']);
+
+  for (const ordinary of [
+    `sb_publishable_${random}_${checksum}`,
+    `sb_secret_${random.slice(1)}_${checksum}`,
+    `sb_secret_${random}A_${checksum}`,
+    `sb_secret_${random}_${checksum.slice(1)}`,
+    `sb_secret_${random}_${checksum}A`,
+    `prefix${token}`,
+    `_${token}`,
+    `${token}_suffix`,
+    'see ' + 'sb_secret_' + 'rotate_backend_service' + '_keys_now' + ' here',
+    'sb_secret_' + 'a'.repeat(22) + '_' + 'b'.repeat(8),
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary, 'ordinary text must not be redacted');
+  }
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('sb_secret_' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Supabase pattern exceeded 500 ms');
+});
+
+test('guard: redacts Stripe webhook signing secrets without catching lookalikes', () => {
+  const token = 'whsec_' + 'aB3cD4eF'.repeat(4);
+  for (const input of [token, `STRIPE_WEBHOOK_SECRET=${token}`, `verify using ${token}.`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Stripe webhook secret']);
+    assert.equal(result.text, input.replace(token, '[Stripe webhook secret removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+  for (const ordinary of [
+    'whsec_ is the Stripe webhook signing secret prefix',
+    'whsec_' + 'a'.repeat(19),
+    'whsec_' + 'a'.repeat(129),
+    `prefix${token}`,
+    `_${token}`,
+    `${token}_suffix`,
+    'pk_live_' + 'a'.repeat(32),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('whsec_' + 'a'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Stripe pattern exceeded 500 ms');
 });
 
 test('guard: removes Discord webhook URLs before they enter shared memory', () => {
@@ -565,14 +753,14 @@ test('guard: detects split-line overrides and context-discard commands', () => {
 
 test('guard: secrets never reach the board; humans are told', () => {
   const s = tmpStore();
-  const t = s.createTask({ title: 'Deploy', description: 'token ghp_abcdefghijklmnopqrstuvwxyz0123456789', actor: 'codex' });
+  const t = s.createTask({ title: 'Deploy', description: 'token ghp_' + 'abcdefghijklmnopqrstuvwxyz0123456789', actor: 'codex' });
   assert.equal(s.getTask(t.id).description, 'token [GitHub token removed]');
-  s.comment(t.id, { actor: 'codex', body: 'my key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123' });
-  s.addNote({ title: 'Creds', body: 'aws AKIAIOSFODNN7EXAMPLE', actor: 'gemini' });
-  s.sendMessage({ from: 'gemini', to: 'you', body: 'Groq gsk_abcdefghijklmnopqrstuvwxyz0123456789AB', actor: 'gemini' });
+  s.comment(t.id, { actor: 'codex', body: 'my key is sk-' + 'ant-api03-abcdefghijklmnopqrstuvwxyz0123' });
+  s.addNote({ title: 'Creds', body: 'aws AKIA' + 'IOSFODNN7EXAMPLE', actor: 'gemini' });
+  s.sendMessage({ from: 'gemini', to: 'you', body: 'Groq gsk_' + 'abcdefghijklmnopqrstuvwxyz0123456789AB', actor: 'gemini' });
   s.sendMessage({ from: 'codex', to: 'you', body: `Discord ${fakeDiscordToken()}`, actor: 'codex' });
   const raw = fs.readFileSync(s.file, 'utf8');
-  for (const leak of ['ghp_abcdefghij', 'sk-ant-api03', 'AKIAIOSFODNN7EXAMPLE', 'gsk_abcdefghijklmnopqrstuvwxyz', fakeDiscordToken()]) assert.ok(!raw.includes(leak), leak);
+  for (const leak of ['ghp_' + 'abcdefghij', 'sk-' + 'ant-api03', 'AKIA' + 'IOSFODNN7EXAMPLE', 'gsk_' + 'abcdefghijklmnopqrstuvwxyz', fakeDiscordToken()]) assert.ok(!raw.includes(leak), leak);
   const inbox = s.inbox({ actor: 'you' });
   assert.ok(inbox.messages.some((m) => m.kind === 'guard' && /GitHub token/.test(m.body) && /Rotate/.test(m.body)));
   assert.equal(s.guardLog().events.length, 5);
@@ -617,9 +805,9 @@ test('guard: WORKBOARD.md commands pass the guard too', () => {
   const s = tmpStore();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ah-gwb-'));
   wb.syncOnce(s, dir);
-  fs.appendFileSync(path.join(dir, wb.BOARD), 'aider: note Setup | export OPENAI_API_KEY=sk-proj-abcdefghijklmnopqrstuvwx1234\n');
+  fs.appendFileSync(path.join(dir, wb.BOARD), 'aider: note Setup | export OPENAI_API_KEY=sk-' + 'proj-abcdefghijklmnopqrstuvwx1234\n');
   wb.syncOnce(s, dir);
   const text = fs.readFileSync(path.join(dir, wb.BOARD), 'utf8') + fs.readFileSync(path.join(dir, wb.LOGBOOK), 'utf8');
-  assert.ok(!text.includes('sk-proj-abcdefghij'));
+  assert.ok(!text.includes('sk-' + 'proj-abcdefghij'));
   assert.match(s.listNotes()[0].body, /\[secret removed\]|\[OpenAI key removed\]/);
 });

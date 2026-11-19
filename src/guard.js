@@ -29,15 +29,26 @@ const SECRET_RULES = [
   ['Anthropic key', /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
   ['OpenAI key', /\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}/g],
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
+  // xAI documents the xai- prefix; bound the opaque payload to avoid partial matches.
+  ['xAI API key', /(?<![A-Za-z0-9_-])xai-[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
+  // Vault 1.10+ distinguishes service, batch and recovery bearer tokens.
+  // Uppercase is a heuristic to avoid redacting ordinary lowercase identifiers,
+  // not a guarantee of the token format.
+  ['HashiCorp Vault token', /(?<![A-Za-z0-9_-])hv[sbr]\.(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,}(?![A-Za-z0-9_-])/g],
   ['SendGrid key', /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}(?=[^A-Za-z0-9_-]|$)/g],
   // The encoded JSON payload is bounded; the last 43 characters are the secret.
   ['Sentry organization token', /(?<![A-Za-z0-9_])sntrys_eyJ[A-Za-z0-9+/]{16,800}={0,2}_[A-Za-z0-9+/]{43}(?![A-Za-z0-9+/=_])/g],
+  // Supabase keys have a 22-character random part and 8-character checksum.
+  // At least one uppercase letter avoids matching ordinary snake_case names.
+  ['Supabase secret key', /(?<![A-Za-z0-9_])sb_secret_(?=[A-Za-z0-9_-]{0,30}[A-Z])[A-Za-z0-9_-]{22}_[A-Za-z0-9_-]{8}(?![A-Za-z0-9_-])/g],
+  ['Grafana service account token', /(?<![A-Za-z0-9_-])glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}(?![A-Za-z0-9_-])/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
   // The webhook URL itself grants unauthenticated posting access.
   ['Discord webhook URL', /\bhttps:\/\/(?:discord|discordapp)\.com\/api(?:\/v\d{1,2})?\/webhooks\/\d{17,20}\/[A-Za-z0-9_-]{30,128}(?![A-Za-z0-9_-])/g],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
+  ['GitLab runner authentication token', /(?<![A-Za-z0-9_-])(?:glrt|glrtr)-[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])/g],
   // Match the documented 1Password service-account prefix and long base64 payload.
   // Bound the payload to avoid scanning arbitrarily long strings on shared boards.
   ['1Password service account token', /(?<![A-Za-z0-9_])ops_eyJ[A-Za-z0-9+/]{250,4096}={0,3}(?![A-Za-z0-9_+/=])/g],
@@ -57,7 +68,10 @@ const SECRET_RULES = [
   // long secret; rotating access tokens add xoxe. No upper bound: oversized
   // credentials must still be removed rather than leaked.
   ['Slack app-level token', /(?<![A-Za-z0-9_.-])(?:xoxe\.)?xapp-[0-9]+-A[A-Z0-9]{6,}-[0-9]{10,}-[A-Za-z0-9]{32,}(?![A-Za-z0-9_-])/g],
+  ['Slack incoming webhook URL', /(?<![A-Za-z0-9._-])https:\/\/hooks\.(?:slack|slack-gov)\.com\/services\/[TE][A-Z0-9]{8,20}\/B[A-Z0-9]{8,20}\/[A-Za-z0-9]{24,128}(?![A-Za-z0-9_-])/gi],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
+  // Webhook endpoint signing secrets are separate from Stripe API keys.
+  ['Stripe webhook secret', /(?<![A-Za-z0-9_])whsec_[A-Za-z0-9]{20,128}(?![A-Za-z0-9_])/g],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
   // Use the scanner-observed token shape, not a broad prefix that eats identifiers.
