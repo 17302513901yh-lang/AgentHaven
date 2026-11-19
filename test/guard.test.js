@@ -13,6 +13,28 @@ const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir()
 const fakeDiscordToken = (signature = 'Z'.repeat(27), id = '123456789012345678') =>
   `${Buffer.from(id).toString('base64url')}.AbC_-7.${signature}`;
 
+test('guard: LangSmith personal and service keys are redacted', () => {
+  for (const kind of ['pt', 'sk']) {
+    const token = `lsv2_${kind}_` + 'Ab3x'.repeat(9);
+    for (const input of [token, `LangSmith: ${token} ready`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['LangSmith API key']);
+      assert.equal(result.text, input.replace(token, '[LangSmith API key removed]'));
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
+    for (const ordinary of [
+      `lsv2_${kind}_` + 'a'.repeat(23),
+      `lsv2_${kind}_` + 'a'.repeat(257),
+      'prefix_' + token,
+    ]) {
+      assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+    }
+    assert.equal(inspect(token + '_suffix').text, '[LangSmith API key removed]');
+  }
+  assert.deepEqual(inspect('lsv2_unknown_' + 'a'.repeat(36)).secrets, []);
+  assert.deepEqual(inspect('lsv2_pt_' + 'a'.repeat(100_000)).secrets, []);
+});
+
 test('guard: Vault service, batch and recovery tokens are redacted', () => {
   for (const prefix of ['hvs', 'hvb', 'hvr']) {
     const token = `${prefix}.` + 'Ab3_'.repeat(8);
