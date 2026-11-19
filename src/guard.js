@@ -55,6 +55,9 @@ const SECRET_RULES = [
   // Cloudflare uses 40 alphanumeric characters and an eight-digit hex checksum.
   ['Cloudflare API credential', /(?<![A-Za-z0-9_-])(?:cfk|cfut|cfat)_[A-Za-z0-9]{40}[0-9a-fA-F]{8}(?![A-Za-z0-9_-])/g],
   ['Linear API key', /(?<![A-Za-z0-9_])lin_api_[A-Za-z0-9]{40}(?![A-Za-z0-9_])/g],
+  // LangSmith personal access tokens and service keys have separate prefixes.
+  // The bounded opaque part is a detector heuristic, not a token validator.
+  ['LangSmith API key', /(?<![A-Za-z0-9_-])lsv2_(?:pt|sk)_[A-Za-z0-9_-]{24,256}(?![A-Za-z0-9_-])/g],
   ['DigitalOcean token', /(?<![A-Za-z0-9_])(?:dop|doo|dor)_v1_[0-9a-f]{64}(?![A-Za-z0-9_])/g],
   ['Shopify token', /(?<![A-Za-z0-9_])(?:shpat|shpca|shppa|shpss)_[0-9a-fA-F]{32}(?![A-Za-z0-9_])/g],
   // Telegram bot tokens are 8-10 digits, a colon and 35 characters. No word
