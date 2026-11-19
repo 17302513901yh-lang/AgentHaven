@@ -165,6 +165,27 @@ test('guard: redacts GitLab runner authentication tokens without masking identif
   assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500);
 });
 
+test('guard: redacts GitLab deploy tokens before shared-memory storage', () => {
+  const token = 'gldt-' + 'Ab3_'.repeat(8); // Synthetic, not a live key.
+  for (const input of [token, `deploy with ${token}`, `Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['GitLab deploy token']);
+    assert.equal(result.text, input.replace(token, '[GitLab deploy token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'must be idempotent');
+  }
+  for (const ordinary of [
+    'GitLab deploy tokens use gldt- as a prefix',
+    'gldt-' + 'A'.repeat(19),
+    'gldt-' + 'A'.repeat(129),
+    `prefix_${token}`,
+    `not${token}`,
+    'gldt-' + 'A'.repeat(150_000),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+  const extended = token + '_suffix';
+  assert.deepEqual(inspect(extended).secrets, ['GitLab deploy token']);
+  assert.equal(inspect(extended).text, '[GitLab deploy token removed]');
+});
+
 test('guard: redacts 1Password service account tokens without matching lookalikes', () => {
   const token = 'ops_eyJ' + 'Ab3/'.repeat(63);
   for (const input of [token, `Use ${token} for authentication`, `Authorization: Bearer ${token}`]) {
