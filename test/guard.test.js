@@ -582,6 +582,27 @@ test('guard: redacts Authorization header credentials without false positives', 
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'header scan exceeded 500 ms');
 });
 
+test('guard: Databricks personal access tokens are redacted', () => {
+  const token = 'dapi' + 'a1B2'.repeat(8);
+  for (const input of [token, `Databricks PAT: ${token} ready`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Databricks personal access token']);
+    assert.equal(result.text, input.replace(token, '[Databricks personal access token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const ordinary of [
+    'Databricks PATs begin with dapi',
+    'dapi' + 'a'.repeat(31),
+    'dapi' + 'a'.repeat(33),
+    'dapi' + 'z'.repeat(32),
+    'prefix_' + token,
+    token + '_suffix',
+    'dapi' + 'a'.repeat(100_000),
+  ]) {
+    assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+  }
+});
+
 test('guard: DigitalOcean tokens are removed without catching lookalikes', () => {
   for (const prefix of ['dop', 'doo', 'dor']) {
     const token = `${prefix}_v1_` + 'a1b2c3d4'.repeat(8);
