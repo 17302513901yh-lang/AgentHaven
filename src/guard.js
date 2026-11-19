@@ -86,7 +86,8 @@ const SECRET_RULES = [
   // Redact the value, not the closing quote; the normal password replacement
   // then preserves both delimiters even for spaces and escaped quotes.
   ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*(["'`]))(?!\[secret removed\]\2)(?:\\.|(?!\2)[^\\\r\n]){6,}(?=\2)/gi],
-  ['connection string password', /\b([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s@/]{3,})(@)/gi],
+  // Bounded URI scheme and credentials avoid catastrophic backtracking on hyphen-heavy input.
+  ['connection string password', /\b([a-z][a-z0-9+.-]{0,31}:\/\/[^\s:/@]{1,256}:)([^\s@/]{3,256})(@)/gi],
   // Run after provider patterns to avoid double-reporting recognized tokens.
   ['authorization token', /\b(Authorization[ \t]*:[ \t]*(?:Bearer|Token|Basic)[ \t]+)([A-Za-z0-9._~+/=-]{16,})(?![A-Za-z0-9._~+/=-])/gi],
   // Also inside names like DB_PASSWORD or OPENAI_API_KEY (an underscore is no word boundary).
