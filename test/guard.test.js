@@ -81,6 +81,33 @@ test('guard: xAI API keys are redacted without masking ordinary text', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
 });
 
+test('guard: NVIDIA NGC API keys are redacted before reaching shared memory', () => {
+  const token = 'nvapi-' + 'Ab3x'.repeat(9);
+  for (const input of [token, `NGC credential: ${token}`, `Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['NVIDIA NGC API key']);
+    assert.equal(result.text, input.replace(token, '[NVIDIA NGC API key removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    'NGC keys use the nvapi- prefix',
+    'see nvapi-model-endpoint-configuration-reference table',
+    'the nvapi-service_account_config_reference module',
+    'nvapi-' + 'a'.repeat(23),
+    'prefix_' + token,
+    'word' + token,
+    'nvapi_' + 'A'.repeat(36),
+  ]) {
+    const result = inspect(ordinary);
+    assert.deepEqual(result.secrets, [], ordinary);
+    assert.equal(result.text, ordinary);
+  }
+
+  const oversized = 'nvapi-' + 'A'.repeat(100_000);
+  assert.equal(inspect(oversized).text, '[NVIDIA NGC API key removed]', 'redact complete oversized key');
+});
+
 test('guard: finds secrets of the common kinds and keeps the rest of the text', () => {
   const cases = {
     'Anthropic key': 'key sk-' + 'ant-api03-abcdefghijklmnopqrstuvwxyz0123',

@@ -64,6 +64,9 @@ const SECRET_RULES = [
   ['DigitalOcean token', /(?<![A-Za-z0-9_])(?:dop|doo|dor)_v1_[0-9a-f]{64}(?![A-Za-z0-9_])/g],
   // Databricks documents dapi-prefixed personal access tokens with 32 hex digits.
   ['Databricks personal access token', /(?<![A-Za-z0-9_-])dapi[0-9a-fA-F]{32}(?![A-Za-z0-9_-])/g],
+  // NVIDIA NGC personal API keys use the nvapi- prefix. Require an uppercase
+  // payload character to avoid redacting ordinary lowercase identifiers.
+  ['NVIDIA NGC API key', /(?<![A-Za-z0-9_-])nvapi-(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,}(?![A-Za-z0-9_-])/g],
   ['Shopify token', /(?<![A-Za-z0-9_])(?:shpat|shpca|shppa|shpss)_[0-9a-fA-F]{32}(?![A-Za-z0-9_])/g],
   // Telegram bot tokens are 8-10 digits, a colon and 35 characters. No word
   // boundary in front: in an API URL the token follows `bot` directly.
