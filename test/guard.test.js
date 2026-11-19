@@ -13,27 +13,6 @@ const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir()
 const fakeDiscordToken = (signature = 'Z'.repeat(27), id = '123456789012345678') =>
   `${Buffer.from(id).toString('base64url')}.AbC_-7.${signature}`;
 
-test('guard: Databricks personal access tokens are redacted', () => {
-  const token = 'dapi' + 'a1B2'.repeat(8);
-  for (const input of [token, `Databricks PAT: ${token} ready`]) {
-    const result = inspect(input);
-    assert.deepEqual(result.secrets, ['Databricks personal access token']);
-    assert.equal(result.text, input.replace(token, '[Databricks personal access token removed]'));
-    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
-  }
-  for (const ordinary of [
-    'Databricks PATs begin with dapi',
-    'dapi' + 'a'.repeat(31),
-    'dapi' + 'a'.repeat(33),
-    'dapi' + 'z'.repeat(32),
-    'prefix_' + token,
-    token + '_suffix',
-    'dapi' + 'a'.repeat(100_000),
-  ]) {
-    assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
-  }
-});
-
 test('guard: Vault service, batch and recovery tokens are redacted', () => {
   for (const prefix of ['hvs', 'hvb', 'hvr']) {
     const token = `${prefix}.` + 'Ab3_'.repeat(8);
@@ -508,6 +487,27 @@ test('guard: redacts Authorization header credentials without false positives', 
   const started = process.hrtime.bigint();
   inspect(longInput);
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'header scan exceeded 500 ms');
+});
+
+test('guard: Databricks personal access tokens are redacted', () => {
+  const token = 'dapi' + 'a1B2'.repeat(8);
+  for (const input of [token, `Databricks PAT: ${token} ready`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Databricks personal access token']);
+    assert.equal(result.text, input.replace(token, '[Databricks personal access token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const ordinary of [
+    'Databricks PATs begin with dapi',
+    'dapi' + 'a'.repeat(31),
+    'dapi' + 'a'.repeat(33),
+    'dapi' + 'z'.repeat(32),
+    'prefix_' + token,
+    token + '_suffix',
+    'dapi' + 'a'.repeat(100_000),
+  ]) {
+    assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+  }
 });
 
 test('guard: DigitalOcean tokens are removed without catching lookalikes', () => {
