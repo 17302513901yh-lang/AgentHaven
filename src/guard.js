@@ -35,15 +35,44 @@ const SECRET_RULES = [
   ['Anthropic key', /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
   ['OpenAI key', /\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}/g],
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
+  // xAI documents the xai- prefix; bound the opaque payload to avoid partial matches.
+  ['xAI API key', /(?<![A-Za-z0-9_-])xai-[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
+  // Vault 1.10+ distinguishes service, batch and recovery bearer tokens.
+  // Uppercase is a heuristic to avoid redacting ordinary lowercase identifiers,
+  // not a guarantee of the token format.
+  ['HashiCorp Vault token', /(?<![A-Za-z0-9_-])hv[sbr]\.(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,}(?![A-Za-z0-9_-])/g],
   ['SendGrid key', /\bSG\.[A-Za-z0-9_-]{22}\.[A-Za-z0-9_-]{43}(?=[^A-Za-z0-9_-]|$)/g],
   // The encoded JSON payload is bounded; the last 43 characters are the secret.
   ['Sentry organization token', /(?<![A-Za-z0-9_])sntrys_eyJ[A-Za-z0-9+/]{16,800}={0,2}_[A-Za-z0-9+/]{43}(?![A-Za-z0-9+/=_])/g],
+  // Docker Hub PATs/OATs have long mixed-case bodies, unlike snake_case or kebab-case names.
+  // Do not cap the body length: an unusually long credential should be redacted too.
+  ['Docker Hub access token', /(?<![A-Za-z0-9_])dckr_(?:pat|oat)_(?=[A-Za-z0-9-]*[A-Z])[A-Za-z0-9-]{27,}(?![A-Za-z0-9_-])/g],
+  // Supabase keys have a 22-character random part and 8-character checksum.
+  // At least one uppercase letter avoids matching ordinary snake_case names.
+  ['Supabase secret key', /(?<![A-Za-z0-9_])sb_secret_(?=[A-Za-z0-9_-]{0,30}[A-Z])[A-Za-z0-9_-]{22}_[A-Za-z0-9_-]{8}(?![A-Za-z0-9_-])/g],
+  // Vercel's five credential types have distinct prefixes; the opaque payload
+  // bound is a detection heuristic, not a fixed-format token validator.
+  ['Vercel API credential', /(?<![A-Za-z0-9_-])vc[piark]_[A-Za-z0-9]{40,80}(?![A-Za-z0-9_-])/g],
+  ['Grafana service account token', /(?<![A-Za-z0-9_-])glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}(?![A-Za-z0-9_-])/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
+  // The webhook URL itself grants unauthenticated posting access.
+  ['Discord webhook URL', /\bhttps:\/\/(?:discord|discordapp)\.com\/api(?:\/v\d{1,2})?\/webhooks\/\d{17,20}\/[A-Za-z0-9_-]{30,128}(?![A-Za-z0-9_-])/g],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
+  ['GitLab runner authentication token', /(?<![A-Za-z0-9_-])(?:glrt|glrtr)-[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])/g],
+  // Match the documented 1Password service-account prefix and long base64 payload.
+  // Bound the payload to avoid scanning arbitrarily long strings on shared boards.
+  ['1Password service account token', /(?<![A-Za-z0-9_])ops_eyJ[A-Za-z0-9+/]{250,4096}={0,3}(?![A-Za-z0-9_+/=])/g],
+  // Cloudflare uses 40 alphanumeric characters and an eight-digit hex checksum.
+  ['Cloudflare API credential', /(?<![A-Za-z0-9_-])(?:cfk|cfut|cfat)_[A-Za-z0-9]{40}[0-9a-fA-F]{8}(?![A-Za-z0-9_-])/g],
   ['Linear API key', /(?<![A-Za-z0-9_])lin_api_[A-Za-z0-9]{40}(?![A-Za-z0-9_])/g],
   ['DigitalOcean token', /(?<![A-Za-z0-9_])(?:dop|doo|dor)_v1_[0-9a-f]{64}(?![A-Za-z0-9_])/g],
+  // Databricks documents dapi-prefixed personal access tokens with 32 hex digits.
+  ['Databricks personal access token', /(?<![A-Za-z0-9_-])dapi[0-9a-fA-F]{32}(?![A-Za-z0-9_-])/g],
+  // NVIDIA NGC personal API keys use the nvapi- prefix. Require an uppercase
+  // payload character to avoid redacting ordinary lowercase identifiers.
+  ['NVIDIA NGC API key', /(?<![A-Za-z0-9_-])nvapi-(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,}(?![A-Za-z0-9_-])/g],
   ['Shopify token', /(?<![A-Za-z0-9_])(?:shpat|shpca|shppa|shpss)_[0-9a-fA-F]{32}(?![A-Za-z0-9_])/g],
   // Telegram bot tokens are 8-10 digits, a colon and 35 characters. No word
   // boundary in front: in an API URL the token follows `bot` directly.
@@ -52,20 +81,26 @@ const SECRET_RULES = [
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
   ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
+  ['Slack incoming webhook URL', /(?<![A-Za-z0-9._-])https:\/\/hooks\.(?:slack|slack-gov)\.com\/services\/[TE][A-Z0-9]{8,20}\/B[A-Z0-9]{8,20}\/[A-Za-z0-9]{24,128}(?![A-Za-z0-9_-])/gi],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
+  // Webhook endpoint signing secrets are separate from Stripe API keys.
+  ['Stripe webhook secret', /(?<![A-Za-z0-9_])whsec_[A-Za-z0-9]{20,128}(?![A-Za-z0-9_])/g],
   // PostHog generates base57 bodies: 48 chars for phx_/phs_, 44 for pha_/phr_.
   // No upper bound: an oversized credential-like string must not be left exposed.
   // phc_ project keys are public and deliberately excluded.
   ['PostHog private token', /(?<![A-Za-z0-9_-])(?:(?:phx|phs)_[2-9A-HJ-NP-Za-km-z]{48,}|(?:pha|phr)_[2-9A-HJ-NP-Za-km-z]{44,})(?![A-Za-z0-9_-])/g, isPostHogPrivateToken],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
+  // Use the scanner-observed token shape, not a broad prefix that eats identifiers.
+  ['Notion integration token', /(?<![A-Za-z0-9_-])ntn_[0-9]{11}[A-Za-z0-9]{35}(?![A-Za-z0-9_-])/g],
   // PyPI macaroons use pypi- followed by at least 85 base64url characters.
   ['PyPI token', /(?<![A-Za-z0-9_-])pypi-[A-Za-z0-9_-]{85,}(?![A-Za-z0-9_-])/g],
   ['JWT', /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g],
   // Redact the value, not the closing quote; the normal password replacement
   // then preserves both delimiters even for spaces and escaped quotes.
   ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*(["'`]))(?!\[secret removed\]\2)(?:\\.|(?!\2)[^\\\r\n]){6,}(?=\2)/gi],
-  ['connection string password', /\b([a-z][a-z0-9+.-]*:\/\/[^\s:/@]+:)([^\s@/]{3,})(@)/gi],
+  // Bounded URI scheme avoids catastrophic backtracking on hyphen-heavy input while keeping credential length unbounded.
+  ['connection string password', /\b([a-z][a-z0-9+.-]{0,63}:\/\/[^\s:/@]+:)([^\s@/]{3,})(@)/gi],
   // Run after provider patterns to avoid double-reporting recognized tokens.
   ['authorization token', /\b(Authorization[ \t]*:[ \t]*(?:Bearer|Token|Basic)[ \t]+)([A-Za-z0-9._~+/=-]{16,})(?![A-Za-z0-9._~+/=-])/gi],
   // Also inside names like DB_PASSWORD or OPENAI_API_KEY (an underscore is no word boundary).
@@ -119,6 +154,7 @@ function inspect(input) {
   const invisible = (text.match(INVISIBLE) || []).length;
   if (invisible) text = text.replace(INVISIBLE, '');
   for (const [kind, re, valid] of SECRET_RULES) {
+    if (kind === 'connection string password' && !text.includes('://')) continue;
     text = text.replace(re, (...m) => {
       if (valid && !valid(m[0])) return m[0];
       secrets.push(kind);

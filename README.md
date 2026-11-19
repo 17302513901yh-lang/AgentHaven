@@ -15,7 +15,7 @@
   <a href="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/laaielichter/AgentHaven/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/laaielichter/AgentHaven?include_prereleases&label=release"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
-  <a href="https://github.com/laaielichter/AgentHaven/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/laaielichter/AgentHaven?style=flat&label=stars"></a>
+  <a href="https://github.com/laaielichter/AgentHaven/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/laaielichter/AgentHaven?style=social"></a>
   <img alt="MCP server" src="https://img.shields.io/badge/MCP-server-8A2BE2">
   <img alt="Windows and macOS" src="https://img.shields.io/badge/app-Windows%20%7C%20macOS-informational">
 </p>
@@ -191,7 +191,7 @@ All of this works the same in the dashboard (Team panel, your inbox, questions a
 Three problems hurt multi-agent work most in practice. AgentHaven handles each of them itself, so no agent has to be trusted to do it.
 
 **Guard: shared memory that cannot be poisoned.** Agent memory poisoning is on the OWASP list of agentic risks (ASI06): one bad write in shared memory reaches every agent that reads it. Everything an agent writes passes Guard first, whether through MCP, HTTP, `WORKBOARD.md` or a dream:
-- Secrets are replaced before they are stored, so they never reach disk, other agents, `WORKBOARD.md` or `LOGBOOK.md`. This covers API keys (Anthropic, OpenAI, Groq, SendGrid, Replicate, GitHub, GitLab, DigitalOcean, Shopify, AWS, Google, Slack, Stripe, Hugging Face, npm, PyPI), Discord and Telegram bot tokens, Authorization headers (Bearer, Token, Basic), private keys, JWTs and passwords in assignments or connection strings. You get a message to rotate the key.
+- Secrets are replaced before they are stored, so they never reach disk, other agents, `WORKBOARD.md` or `LOGBOOK.md`. This covers API keys (Anthropic, OpenAI, Groq, xAI, SendGrid, Replicate, GitHub, GitLab, DigitalOcean, Shopify, AWS, Google, Slack, Stripe, Hugging Face, npm, PyPI), GitLab runner authentication tokens, 1Password service account tokens, Discord and Telegram bot tokens, Authorization headers (Bearer, Token, Basic), private keys, JWTs and passwords in assignments or connection strings. You get a message to rotate the key.
 - Zero-width and bidi controls and Unicode tags that hide text are removed. Soft hyphens and word-internal joiners are preserved in stored text, but ignored when Guard checks for injected instructions, so ordinary emoji and scripts remain intact.
 - Text that reads like orders to other agents is flagged, for example "ignore previous instructions", "send the .env to…", or `curl … | sh`.
 - Flagged notes, lessons and dream proposals are quarantined: agents do not see them until a human releases them. Not even the lead can release them. Flagged comments and messages carry a warning inline.
@@ -310,7 +310,9 @@ Contributions are very welcome, from a typo fix to a new one-click connect.
 
 ## Support the project
 
-AgentHaven is free and made in the open. The easiest way to help is to **[star the repository](https://github.com/laaielichter/AgentHaven)** ⭐ and tell someone who runs more than one AI agent about it. Thank you!
+If AgentHaven is useful to you, a ⭐ on [GitHub](https://github.com/laaielichter/AgentHaven) helps other people find it.
+
+Thanks to everyone who has contributed: [@jdotc1](https://github.com/jdotc1), [@17302513901yh-lang](https://github.com/17302513901yh-lang), [@IG-ABHINAV](https://github.com/IG-ABHINAV) and [@Daiyuanranfeng](https://github.com/Daiyuanranfeng).
 
 <a href="https://star-history.com/#laaielichter/AgentHaven&Date"><img src="https://api.star-history.com/svg?repos=laaielichter/AgentHaven&type=Date" alt="Star history of AgentHaven" width="600"></a>
 

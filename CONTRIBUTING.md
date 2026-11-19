@@ -4,7 +4,7 @@ Thanks for helping. Small fixes and big ideas are both welcome.
 
 ## Ways to help
 
-- Star the repository ⭐ so more people find it.
+- Star the repository ⭐. It is a simple way to keep it in your list and helps others find it, but it is never needed to get an issue, help or a review.
 - Report a bug or suggest a feature with the issue forms.
 - Pick an issue labeled [`good first issue`](https://github.com/laaielichter/AgentHaven/labels/good%20first%20issue) or [`help wanted`](https://github.com/laaielichter/AgentHaven/labels/help%20wanted). Comment on it first so nobody else starts the same work.
 - Try AgentHaven with an agent or MCP client we have not tested, and tell us what happened.
