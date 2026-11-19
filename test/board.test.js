@@ -248,6 +248,11 @@ test('workboard: parsing helpers', () => {
   assert.equal(n.priority, 0);
   assert.deepEqual(n.dependsOn, ['task_abc', 'task_def']);
   assert.deepEqual(n.budget, { costUsd: 3 });
+  assert.deepEqual(wb.parseNew('x [budget: 3]').budget, { costUsd: 3 });
+  assert.deepEqual(wb.parseNew('x [budget: 0.5]').budget, { costUsd: 0.5 });
+  assert.throws(() => wb.parseNew('x [budget: ]'), /needs an amount/);
+  assert.throws(() => wb.parseNew('x [budget: $]'), /needs an amount/);
+  assert.throws(() => wb.parseNew('x [budget: $ ]'), /needs an amount/);
   assert.equal(n.review, true);
   assert.throws(() => wb.parseNew('P5 fix it'), /priority must be P0 \(urgent\) to P3 \(low\)/);
   assert.throws(() => wb.parseNew('P9 fix it'), /priority must be P0 \(urgent\) to P3 \(low\)/);
