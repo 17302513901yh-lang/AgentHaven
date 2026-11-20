@@ -24,13 +24,26 @@ function isDiscordBotToken(token) {
   return /^\d{17,20}$/.test(id) && Buffer.from(id).toString('base64url') === encodedId;
 }
 
+// PostHog-generated credentials are random base57 strings, not prose. Avoid
+// altering ordinary lowercase identifiers even if they are unusually long.
+function isPostHogPrivateToken(token) {
+  return /[2-9A-HJ-NP-Z]/.test(token.slice(4));
+}
+
 const SECRET_RULES = [
   ['private key', /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z ]+ )?PRIVATE KEY-----|$)/g],
   ['Anthropic key', /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
   ['OpenAI key', /\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}/g],
+  // Firecrawl keys use the documented fc- prefix. The uppercase requirement
+  // and body-length bounds are heuristics to avoid masking ordinary identifiers,
+  // not guarantees of the token format.
+  ['Firecrawl API key', /(?<![A-Za-z0-9_-])fc-(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
   // xAI documents the xai- prefix; bound the opaque payload to avoid partial matches.
   ['xAI API key', /(?<![A-Za-z0-9_-])xai-[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
+  // Resend keys have a re_ prefix; uppercase avoids lowercase snake_case identifiers.
+  // No maximum length: unusually long credentials must also be redacted.
+  ['Resend API key', /(?<=^|[^A-Za-z0-9_-])re_(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,}(?=[^A-Za-z0-9_-]|$)/g],
   // Vault 1.10+ distinguishes service, batch and recovery bearer tokens.
   // Uppercase is a heuristic to avoid redacting ordinary lowercase identifiers,
   // not a guarantee of the token format.
@@ -48,6 +61,10 @@ const SECRET_RULES = [
   // bound is a detection heuristic, not a fixed-format token validator.
   ['Vercel API credential', /(?<![A-Za-z0-9_-])vc[piark]_[A-Za-z0-9]{40,80}(?![A-Za-z0-9_-])/g],
   ['Grafana service account token', /(?<![A-Za-z0-9_-])glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}(?![A-Za-z0-9_-])/g],
+  // Tailscale API, auth, OAuth client, SCIM and webhook keys use typed,
+  // two-component tskey-* values; require uppercase in the second segment
+  // to avoid lowercase kebab-case names, and exclude adjacent identifier characters.
+  ['Tailscale key', /(?<=^|[^A-Za-z0-9_-])tskey-(?:api|auth|client|scim|webhook)-[A-Za-z0-9]{8,}-(?=[A-Za-z0-9]*[A-Z])[A-Za-z0-9]{12,}(?=[^A-Za-z0-9_-]|$)/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
   // The webhook URL itself grants unauthenticated posting access.
@@ -55,6 +72,9 @@ const SECRET_RULES = [
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
   ['GitLab runner authentication token', /(?<![A-Za-z0-9_-])(?:glrt|glrtr)-[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])/g],
+  // GitLab deploy tokens have a distinct prefix. Requiring uppercase is a
+  // heuristic to avoid lowercase identifiers, not a guarantee of token format.
+  ['GitLab deploy token', /(?<=^|[^A-Za-z0-9_-])gldt-(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{20,128}(?=[^A-Za-z0-9_-]|$)/g],
   // Match the documented 1Password service-account prefix and long base64 payload.
   // Bound the payload to avoid scanning arbitrarily long strings on shared boards.
   ['1Password service account token', /(?<![A-Za-z0-9_])ops_eyJ[A-Za-z0-9+/]{250,4096}={0,3}(?![A-Za-z0-9_+/=])/g],
@@ -75,10 +95,18 @@ const SECRET_RULES = [
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
   ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
+  // App-level (Socket Mode) tokens have a version, Slack app ID, numeric ID and
+  // long secret; rotating access tokens add xoxe. No upper bound: oversized
+  // credentials must still be removed rather than leaked.
+  ['Slack app-level token', /(?<![A-Za-z0-9_.-])(?:xoxe\.)?xapp-[0-9]+-A[A-Z0-9]{6,}-[0-9]{10,}-[A-Za-z0-9]{32,}(?![A-Za-z0-9_-])/g],
   ['Slack incoming webhook URL', /(?<![A-Za-z0-9._-])https:\/\/hooks\.(?:slack|slack-gov)\.com\/services\/[TE][A-Z0-9]{8,20}\/B[A-Z0-9]{8,20}\/[A-Za-z0-9]{24,128}(?![A-Za-z0-9_-])/gi],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   // Webhook endpoint signing secrets are separate from Stripe API keys.
   ['Stripe webhook secret', /(?<![A-Za-z0-9_])whsec_[A-Za-z0-9]{20,128}(?![A-Za-z0-9_])/g],
+  // PostHog generates base57 bodies: 48 chars for phx_/phs_, 44 for pha_/phr_.
+  // No upper bound: an oversized credential-like string must not be left exposed.
+  // phc_ project keys are public and deliberately excluded.
+  ['PostHog private token', /(?<![A-Za-z0-9_-])(?:(?:phx|phs)_[2-9A-HJ-NP-Za-km-z]{48,}|(?:pha|phr)_[2-9A-HJ-NP-Za-km-z]{44,})(?![A-Za-z0-9_-])/g, isPostHogPrivateToken],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
   // Use the scanner-observed token shape, not a broad prefix that eats identifiers.
