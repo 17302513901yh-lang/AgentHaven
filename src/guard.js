@@ -43,8 +43,9 @@ const SECRET_RULES = [
   ['Supabase secret key', /(?<![A-Za-z0-9_])sb_secret_(?=[A-Za-z0-9_-]{0,30}[A-Z])[A-Za-z0-9_-]{22}_[A-Za-z0-9_-]{8}(?![A-Za-z0-9_-])/g],
   ['Grafana service account token', /(?<![A-Za-z0-9_-])glsa_[A-Za-z0-9]{32}_[A-Fa-f0-9]{8}(?![A-Za-z0-9_-])/g],
   // Tailscale API, auth, OAuth client, SCIM and webhook keys use typed,
-  // two-component tskey-* values; exclude adjacent identifier characters.
-  ['Tailscale key', /(?<![A-Za-z0-9_-])tskey-(?:api|auth|client|scim|webhook)-[A-Za-z0-9]{8,32}-[A-Za-z0-9]{12,128}(?![A-Za-z0-9_-])/g],
+  // two-component tskey-* values; require a mixed-case second segment to
+  // avoid lowercase kebab-case names, and exclude adjacent identifier characters.
+  ['Tailscale key', /(?<=^|[^A-Za-z0-9_-])tskey-(?:api|auth|client|scim|webhook)-[A-Za-z0-9]{8,}-(?=[A-Za-z0-9]*[A-Z])[A-Za-z0-9]{12,}(?=[^A-Za-z0-9_-]|$)/g],
   ['Replicate token', /\br8_[A-Za-z0-9]{30,}\b/g],
   ['Discord bot token', /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{23,28}\.[A-Za-z0-9_-]{6,7}\.[A-Za-z0-9_-]{27,38}(?=[^A-Za-z0-9_-]|$)/g, isDiscordBotToken],
   // The webhook URL itself grants unauthenticated posting access.

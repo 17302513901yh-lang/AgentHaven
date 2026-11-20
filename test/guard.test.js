@@ -295,9 +295,26 @@ test('guard: Tailscale API, auth, client, SCIM and webhook keys are redacted', (
     }
   }
 
+  // No upper bound: over-long credentials must be removed in full.
+  for (const overlongToken of [
+    `tskey-api-${'Ab3x'.repeat(9)}-${'C4dE'.repeat(5)}`, // first segment > 32
+    `tskey-auth-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(33)}`, // second segment > 128
+    `tskey-scim-${'Ab3x'.repeat(40)}-${'C4dE'.repeat(40)}`, // both segments over-long
+    `tskey-webhook-${'a'.repeat(8)}-${'b'.repeat(11)}Z`, // uppercase at the end
+  ]) {
+    const input = `Tailscale: ${overlongToken} ready`;
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Tailscale key'], overlongToken);
+    assert.equal(result.text, 'Tailscale: [Tailscale key removed] ready', 'must redact the complete credential');
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
   const token = `tskey-api-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(5)}`;
   for (const ordinary of [
     'Tailscale keys begin with tskey-api-',
+    'tskey-api-authentication-configuration',
+    `tskey-api-${'A'.repeat(12)}-${'b'.repeat(20)}`,
+    `tskey-webhook-${'Ab3x'.repeat(3)}-${'c'.repeat(20)}`,
     `tskey-api-${'A'.repeat(7)}-${'B'.repeat(20)}`,
     `tskey-api-${'A'.repeat(12)}-${'B'.repeat(11)}`,
     `tskey-unknown-${'A'.repeat(12)}-${'B'.repeat(20)}`,
