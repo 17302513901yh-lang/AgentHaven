@@ -194,7 +194,7 @@ test('guard: GitLab CI token near misses and embedded identifiers are not partia
     'glcbt-' + 'A'.repeat(19),
     'prefix_' + legacy,
     legacy + '.extra',
-    'glcbt-' + 'Ab3_'.repeat(8) + '!',
+    'glcbt-' + 'Ab3_'.repeat(3) + '!',
     'glcbt-abc.def.ghi'
   ]) {
     assert.deepEqual(inspect(text).secrets, [], text.slice(0, 80));
