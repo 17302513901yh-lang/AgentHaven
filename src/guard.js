@@ -31,8 +31,9 @@ const SECRET_RULES = [
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
   // xAI documents the xai- prefix; bound the opaque payload to avoid partial matches.
   ['xAI API key', /(?<![A-Za-z0-9_-])xai-[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
-  // Tavily documents the tvly- prefix; require a long, bounded opaque payload.
-  ['Tavily API key', /(?<![A-Za-z0-9_-])tvly-[A-Za-z0-9_-]{32,128}(?![A-Za-z0-9_-])/g],
+  // Tavily documents the tvly- prefix; require a bounded payload with uppercase
+  // as a heuristic to avoid masking ordinary lowercase identifiers.
+  ['Tavily API key', /(?<![A-Za-z0-9_-])tvly-(?=[A-Za-z0-9_-]{0,127}[A-Z])[A-Za-z0-9_-]{32,128}(?![A-Za-z0-9_-])/g],
   // Vault 1.10+ distinguishes service, batch and recovery bearer tokens.
   // Uppercase is a heuristic to avoid redacting ordinary lowercase identifiers,
   // not a guarantee of the token format.

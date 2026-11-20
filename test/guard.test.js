@@ -97,8 +97,14 @@ test('guard: Tavily API keys are redacted before reaching shared agent memory', 
     `prefix_${token}`,
     `prefix${token}`,
     'tvly_' + 'A'.repeat(40),
+    'see tvly-search-plugin-configuration-reference-docs table',
+    'the tvly-search_client_configuration_reference_module module',
+    'see tvly-rotate-ci-token-for-release-2024-notes here',
+    'tvly-web-search-agent-integration-guide-for-tavily',
   ]) {
-    assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+    const result = inspect(ordinary);
+    assert.deepEqual(result.secrets, [], ordinary.slice(0, 80));
+    assert.equal(result.text, ordinary, 'ordinary identifier must be preserved');
   }
 
   const started = process.hrtime.bigint();
