@@ -275,11 +275,15 @@ test('guard: removes GitLab pipeline trigger credentials from shared memory', ()
     'glptt-' + 'A'.repeat(19),
     'glptt-' + 'A'.repeat(129),
     'prefix_' + token,
-    token + '_suffix',
     'glptt-' + 'a'.repeat(100_000),
   ]) {
     assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
   }
+  // A suffix is part of the opaque token alphabet, so fail closed instead
+  // of exposing the enlarged credential or masking only a prefix.
+  const extended = token + '_suffix';
+  assert.deepEqual(inspect(extended).secrets, ['GitLab pipeline trigger token']);
+  assert.equal(inspect(extended).text, '[GitLab pipeline trigger token removed]');
 });
 
 test('guard: redacts GitLab deploy tokens before shared-memory storage', () => {
