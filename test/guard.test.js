@@ -81,6 +81,39 @@ test('guard: xAI API keys are redacted without masking ordinary text', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
 });
 
+test('guard: Resend API keys are redacted without masking ordinary identifiers', () => {
+  const token = 're_' + 'Ab3x'.repeat(8);
+  for (const candidate of [token, 're_' + 'a'.repeat(23) + 'Z']) {
+    for (const input of [candidate, `Use ${candidate} for transactional mail`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Resend API key']);
+      assert.equal(result.text, input.replace(candidate, '[Resend API key removed]'));
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
+  }
+
+  for (const oversized of ['re_' + 'A'.repeat(129), 're_' + 'A'.repeat(150_000)]) {
+    const result = inspect(oversized);
+    assert.deepEqual(result.secrets, ['Resend API key']);
+    assert.equal(result.text, '[Resend API key removed]', 'must redact entire oversized key');
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    'Resend API keys have an re_ prefix',
+    're_' + 'A'.repeat(23),
+    'call re_extract_all_urls_from_html_body here',
+    'table re_export_customer_billing_records_2024',
+    `prefix_${token}`,
+    `not${token}`,
+    're_' + 'a'.repeat(150_000),
+  ]) {
+    const result = inspect(ordinary);
+    assert.deepEqual(result.secrets, [], ordinary.slice(0, 80));
+    assert.equal(result.text, ordinary, 'must preserve ordinary identifiers');
+  }
+});
+
 test('guard: NVIDIA NGC API keys are redacted before reaching shared memory', () => {
   const token = 'nvapi-' + 'Ab3x'.repeat(9);
   for (const input of [token, `NGC credential: ${token}`, `Bearer ${token}`]) {
