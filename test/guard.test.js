@@ -261,6 +261,27 @@ test('guard: redacts GitLab runner authentication tokens without masking identif
   assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500);
 });
 
+test('guard: removes GitLab pipeline trigger credentials from shared memory', () => {
+  const token = 'glptt-' + 'Ab3x'.repeat(8); // Synthetic, not an issued token.
+  for (const input of [token, `pipeline ${token} ready`, `Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['GitLab pipeline trigger token']);
+    assert.equal(result.text, input.replace(token, '[GitLab pipeline trigger token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+  for (const ordinary of [
+    'GitLab uses glptt- for pipeline trigger tokens',
+    'glptt-' + 'a'.repeat(32),
+    'glptt-' + 'A'.repeat(19),
+    'glptt-' + 'A'.repeat(129),
+    'prefix_' + token,
+    token + '_suffix',
+    'glptt-' + 'a'.repeat(100_000),
+  ]) {
+    assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+  }
+});
+
 test('guard: redacts GitLab deploy tokens before shared-memory storage', () => {
   const token = 'gldt-' + 'Ab3_'.repeat(8); // Synthetic, not a live key.
   for (const input of [token, `deploy with ${token}`, `Bearer ${token}`]) {
