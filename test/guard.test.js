@@ -195,9 +195,14 @@ test('guard: GitLab CI token near misses and embedded identifiers are not partia
     'prefix_' + legacy,
     legacy + '.extra',
     'glcbt-' + 'Ab3_'.repeat(3) + '!',
-    'glcbt-abc.def.ghi'
+    'glcbt-abc.def.ghi',
+    'see glcbt-search-plugin-configuration-reference-docs here',
+    'the glcbt-search_client_configuration_reference_module',
+    'see glcbt-rotate-ci-token-for-release-2024-notes here'
   ]) {
-    assert.deepEqual(inspect(text).secrets, [], text.slice(0, 80));
+    const result = inspect(text);
+    assert.deepEqual(result.secrets, [], text.slice(0, 80));
+    assert.equal(result.text, text, 'ordinary identifiers must remain unchanged');
   }
 });
 
