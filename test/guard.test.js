@@ -13,6 +13,42 @@ const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir()
 const fakeDiscordToken = (signature = 'Z'.repeat(27), id = '123456789012345678') =>
   `${Buffer.from(id).toString('base64url')}.AbC_-7.${signature}`;
 
+test('guard: Firecrawl API keys are fully removed without masking ordinary text', () => {
+  for (const token of [
+    'fc-' + 'Ab3x'.repeat(9),
+    'fc-' + 'a'.repeat(23) + 'Z',
+    'fc-' + 'a'.repeat(127) + 'Z',
+  ]) {
+    for (const input of [token, `Firecrawl credential: ${token} ready`]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['Firecrawl API key']);
+      assert.equal(scanned.text, input.replace(token, '[Firecrawl API key removed]'));
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+    }
+  }
+
+  const token = 'fc-' + 'Ab3x'.repeat(9);
+  for (const ordinary of [
+    'Firecrawl keys begin with fc-',
+    'fc-' + 'A'.repeat(23),
+    'fc-' + 'a'.repeat(24),
+    'not' + token,
+    `_${token}`,
+    'fc-' + 'A'.repeat(129),
+    'see fc-search-plugin-configuration-reference-docs here',
+    'the fc-search_client_configuration_reference_module',
+    'see fc-rotate-ci-token-for-release-2024-notes here',
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary, 'ordinary text must remain unchanged');
+  }
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('fc-' + 'a'.repeat(149_999) + 'Z').secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Firecrawl pattern exceeded 500 ms');
+});
+
 test('guard: Vault service, batch and recovery tokens are redacted', () => {
   for (const prefix of ['hvs', 'hvb', 'hvr']) {
     const token = `${prefix}.` + 'Ab3_'.repeat(8);
@@ -110,6 +146,39 @@ test('guard: Tavily API keys are redacted before reaching shared agent memory', 
   const started = process.hrtime.bigint();
   assert.deepEqual(inspect('tvly-' + 'A'.repeat(150_000)).secrets, []);
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Tavily pattern exceeded 500 ms');
+});
+
+test('guard: Resend API keys are redacted without masking ordinary identifiers', () => {
+  const token = 're_' + 'Ab3x'.repeat(8);
+  for (const candidate of [token, 're_' + 'a'.repeat(23) + 'Z']) {
+    for (const input of [candidate, `Use ${candidate} for transactional mail`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Resend API key']);
+      assert.equal(result.text, input.replace(candidate, '[Resend API key removed]'));
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
+  }
+
+  for (const oversized of ['re_' + 'A'.repeat(129), 're_' + 'A'.repeat(150_000)]) {
+    const result = inspect(oversized);
+    assert.deepEqual(result.secrets, ['Resend API key']);
+    assert.equal(result.text, '[Resend API key removed]', 'must redact entire oversized key');
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    'Resend API keys have an re_ prefix',
+    're_' + 'A'.repeat(23),
+    'call re_extract_all_urls_from_html_body here',
+    'table re_export_customer_billing_records_2024',
+    `prefix_${token}`,
+    `not${token}`,
+    're_' + 'a'.repeat(150_000),
+  ]) {
+    const result = inspect(ordinary);
+    assert.deepEqual(result.secrets, [], ordinary.slice(0, 80));
+    assert.equal(result.text, ordinary, 'must preserve ordinary identifiers');
+  }
 });
 
 test('guard: NVIDIA NGC API keys are redacted before reaching shared memory', () => {
@@ -221,6 +290,45 @@ test('guard: redacts GitLab runner authentication tokens without masking identif
   const start = process.hrtime.bigint();
   assert.deepEqual(inspect(`glrt-${'A'.repeat(150_000)}`).secrets, []);
   assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500);
+});
+
+test('guard: redacts GitLab deploy tokens before shared-memory storage', () => {
+  const token = 'gldt-' + 'Ab3_'.repeat(8); // Synthetic, not a live key.
+  for (const input of [token, `deploy with ${token}`, `Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['GitLab deploy token']);
+    assert.equal(result.text, input.replace(token, '[GitLab deploy token removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'must be idempotent');
+  }
+  // The uppercase heuristic preserves mixed-case bodies across size boundaries.
+  for (const valid of [
+    'gldt-' + 'a'.repeat(19) + 'Z',
+    'gldt-' + 'a'.repeat(23) + 'Z',
+    'gldt-' + 'a'.repeat(127) + 'Z',
+  ]) {
+    const result = inspect(valid);
+    assert.deepEqual(result.secrets, ['GitLab deploy token'], valid.slice(0, 50));
+    assert.equal(result.text, '[GitLab deploy token removed]');
+    assert.deepEqual(inspect(result.text).secrets, [], 'must be idempotent');
+  }
+  for (const ordinary of [
+    'GitLab deploy tokens use gldt- as a prefix',
+    'gldt-' + 'a'.repeat(24),
+    'see gldt-search-plugin-configuration-reference-docs here',
+    'the gldt-search_client_configuration_reference_module',
+    'see gldt-rotate-ci-token-for-release-2024-notes here',
+    'gldt-' + 'A'.repeat(19),
+    'gldt-' + 'A'.repeat(129),
+    `prefix_${token}`,
+    `not${token}`,
+    'gldt-' + 'A'.repeat(150_000),
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+  const start = process.hrtime.bigint();
+  assert.deepEqual(inspect('gldt-' + 'a'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - start) / 1e6 < 500, 'GitLab deploy scan exceeded 500 ms');
+  const extended = token + '_suffix';
+  assert.deepEqual(inspect(extended).secrets, ['GitLab deploy token']);
+  assert.equal(inspect(extended).text, '[GitLab deploy token removed]');
 });
 
 test('guard: redacts 1Password service account tokens without matching lookalikes', () => {
@@ -339,6 +447,50 @@ test('guard: redacts Grafana service account tokens without masking lookalikes',
     `${token}_extra`,
     'glsa_' + 'A'.repeat(100_000) + '_a1b2c3d4',
   ]) assert.deepEqual(inspect(lookalike).secrets, [], lookalike.slice(0, 80));
+});
+
+test('guard: Tailscale API, auth, client, SCIM and webhook keys are redacted', () => {
+  // Key-shaped synthetic strings, never live credentials.
+  for (const type of ['api', 'auth', 'client', 'scim', 'webhook']) {
+    const token = `tskey-${type}-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(5)}`;
+    for (const input of [token, `Tailscale key: ${token}`, `Bearer ${token}`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Tailscale key']);
+      assert.equal(result.text, input.replace(token, '[Tailscale key removed]'));
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
+  }
+
+  // No upper bound: over-long credentials must be removed in full.
+  for (const overlongToken of [
+    `tskey-api-${'Ab3x'.repeat(9)}-${'C4dE'.repeat(5)}`, // first segment > 32
+    `tskey-auth-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(33)}`, // second segment > 128
+    `tskey-scim-${'Ab3x'.repeat(40)}-${'C4dE'.repeat(40)}`, // both segments over-long
+    `tskey-webhook-${'a'.repeat(8)}-${'b'.repeat(11)}Z`, // uppercase at the end
+  ]) {
+    const input = `Tailscale: ${overlongToken} ready`;
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Tailscale key'], overlongToken);
+    assert.equal(result.text, 'Tailscale: [Tailscale key removed] ready', 'must redact the complete credential');
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  const token = `tskey-api-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(5)}`;
+  for (const ordinary of [
+    'Tailscale keys begin with tskey-api-',
+    'tskey-api-authentication-configuration',
+    `tskey-api-${'A'.repeat(12)}-${'b'.repeat(20)}`,
+    `tskey-webhook-${'Ab3x'.repeat(3)}-${'c'.repeat(20)}`,
+    `tskey-api-${'A'.repeat(7)}-${'B'.repeat(20)}`,
+    `tskey-api-${'A'.repeat(12)}-${'B'.repeat(11)}`,
+    `tskey-unknown-${'A'.repeat(12)}-${'B'.repeat(20)}`,
+    `prefix_${token}`,
+    `${token}_suffix`,
+  ]) {
+    const result = inspect(ordinary);
+    assert.deepEqual(result.secrets, [], ordinary);
+    assert.equal(result.text, ordinary);
+  }
 });
 
 test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
@@ -469,6 +621,48 @@ test('guard: Docker Hub lowercase kebab-case identifiers with digits stay unchan
     assert.deepEqual(scanned.secrets, [], ordinary);
     assert.equal(scanned.text, ordinary);
   }
+});
+
+test('guard: redacts Slack app-level and rotating tokens', () => {
+  const token = `xapp-1-A02BC3DEF4G-1234567890123-${'a1B2'.repeat(16)}`;
+  const rotating = 'xoxe.' + token;
+  for (const secret of [token, rotating]) {
+    for (const input of [secret, `SLACK_APP_TOKEN=${secret}`, `send ${secret}.`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Slack app-level token']);
+      assert.equal(result.text, input.replace(secret, '[Slack app-level token removed]'));
+      assert.deepEqual(inspect(result.text).secrets, []);
+    }
+  }
+
+  const oversized = `xapp-1-A02BC3DEF4G-1234567890123-${'a'.repeat(300)}`;
+  for (const secret of [oversized, `xoxe.${oversized}`]) {
+    const result = inspect(`send ${secret} now`);
+    assert.equal(result.text, 'send [Slack app-level token removed] now');
+    assert.deepEqual(result.secrets, ['Slack app-level token']);
+    assert.deepEqual(inspect(result.text).secrets, []);
+  }
+
+  for (const ordinary of [
+    'xapp- denotes an app-level token',
+    'use xapp-level-token-configuration-guide here',
+    'the xapp-socket-mode-connection-handler module',
+    'npm i @slack/xapp-token-rotation-helper',
+    `xapp-1-A02BC3DEF4G-1234567890123-${'a'.repeat(31)}`,
+    `xapp-1-a02BC3DEF4G-1234567890123-${'a'.repeat(64)}`,
+    `xapp-1-A02BC3DEF4G-123456789-${'a'.repeat(64)}`,
+    `${token}_suffix`,
+    `prefix${token}`,
+    `_${token}`,
+    `prefix${rotating}`,
+    `_${rotating}`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 75));
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('xapp-' + 'A'.repeat(150_000)).secrets, []);
+  const longToken = `xapp-1-A02BC3DEF4G-1234567890123-${'a'.repeat(150_000)}`;
+  assert.equal(inspect(longToken).text, '[Slack app-level token removed]');
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Slack pattern exceeded 500 ms');
 });
 
 test('guard: masks Supabase secret keys but never publishable keys', () => {
@@ -969,4 +1163,45 @@ test('guard: connection string password rule bounds scan time on long hyphen-hea
     assert.equal(result.text, longHyphenated);
     assert.ok(durationMs < 500, `connection string rule took ${durationMs.toFixed(1)} ms, expected < 500 ms`);
   }
+});
+
+test('guard: redacts generated-format PostHog secrets without masking prose', () => {
+  const marker = '[PostHog private token removed]';
+  // PostHog uses 35 bytes (48 base57 chars) for personal/project secrets,
+  // and 32 bytes (44 base57 chars) for OAuth access/refresh tokens.
+  for (const [prefix, bodyLength] of [['phx', 48], ['phs', 48], ['pha', 44], ['phr', 44]]) {
+    const token = `${prefix}_${'Ab3x'.repeat(bodyLength / 4)}`;
+    for (const input of [token, `PostHog credential: ${token} done`, `key=${token}\nnext`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['PostHog private token'], prefix);
+      assert.equal(result.text, input.replace(token, marker), prefix);
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
+    // Do not silently leak an oversized token just because it exceeds an upper limit.
+    const oversized = `${prefix}_${'A'.repeat(129)}`;
+    assert.equal(inspect(oversized).text, marker, prefix);
+  }
+
+  const privateToken = `phx_${'Ab3x'.repeat(12)}`;
+  for (const ordinary of [
+    `phc_${'Ab3x'.repeat(12)}`, // public project token
+    `phx_${'Ab3x'.repeat(11)}`, // below personal-key length
+    `phs_${'Ab3x'.repeat(11)}`,
+    `pha_${'Ab3x'.repeat(10)}Ab3`, // below OAuth length
+    `phr_${'Ab3x'.repeat(10)}Ab3`,
+    'see phs_patient_health_summary_v2 table',
+    'column pha_inventory_report_2024 here',
+    'phr_quarterly_revenue_breakdown_final',
+    `phs_${'a'.repeat(100)}`, // lowercase prose-like name
+    `phx_${'a'.repeat(150_000)}`,
+    `phx_${'Ab3x'.repeat(12)}_suffix`,
+    `phs_${'Ab3x'.repeat(12)}-suffix`,
+    `phx_${'Ab3x'.repeat(12)}0`, // 0 is outside PostHog's base57 alphabet
+    `prefix_${privateToken}`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+
+  const longToken = `phx_${'A'.repeat(150_000)}`;
+  const started = process.hrtime.bigint();
+  assert.equal(inspect(longToken).text, marker);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'PostHog scan exceeded 500 ms');
 });
