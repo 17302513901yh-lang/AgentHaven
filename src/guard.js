@@ -34,6 +34,10 @@ const SECRET_RULES = [
   ['private key', /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z ]+ )?PRIVATE KEY-----|$)/g],
   ['Anthropic key', /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
   ['OpenAI key', /\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_-]{20,}/g],
+  // Firecrawl keys use the documented fc- prefix. The uppercase requirement
+  // and body-length bounds are heuristics to avoid masking ordinary identifiers,
+  // not guarantees of the token format.
+  ['Firecrawl API key', /(?<![A-Za-z0-9_-])fc-(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
   // xAI documents the xai- prefix; bound the opaque payload to avoid partial matches.
   ['xAI API key', /(?<![A-Za-z0-9_-])xai-[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],

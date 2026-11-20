@@ -13,6 +13,42 @@ const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir()
 const fakeDiscordToken = (signature = 'Z'.repeat(27), id = '123456789012345678') =>
   `${Buffer.from(id).toString('base64url')}.AbC_-7.${signature}`;
 
+test('guard: Firecrawl API keys are fully removed without masking ordinary text', () => {
+  for (const token of [
+    'fc-' + 'Ab3x'.repeat(9),
+    'fc-' + 'a'.repeat(23) + 'Z',
+    'fc-' + 'a'.repeat(127) + 'Z',
+  ]) {
+    for (const input of [token, `Firecrawl credential: ${token} ready`]) {
+      const scanned = inspect(input);
+      assert.deepEqual(scanned.secrets, ['Firecrawl API key']);
+      assert.equal(scanned.text, input.replace(token, '[Firecrawl API key removed]'));
+      assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+    }
+  }
+
+  const token = 'fc-' + 'Ab3x'.repeat(9);
+  for (const ordinary of [
+    'Firecrawl keys begin with fc-',
+    'fc-' + 'A'.repeat(23),
+    'fc-' + 'a'.repeat(24),
+    'not' + token,
+    `_${token}`,
+    'fc-' + 'A'.repeat(129),
+    'see fc-search-plugin-configuration-reference-docs here',
+    'the fc-search_client_configuration_reference_module',
+    'see fc-rotate-ci-token-for-release-2024-notes here',
+  ]) {
+    const scanned = inspect(ordinary);
+    assert.deepEqual(scanned.secrets, [], ordinary);
+    assert.equal(scanned.text, ordinary, 'ordinary text must remain unchanged');
+  }
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('fc-' + 'a'.repeat(149_999) + 'Z').secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Firecrawl pattern exceeded 500 ms');
+});
+
 test('guard: Vault service, batch and recovery tokens are redacted', () => {
   for (const prefix of ['hvs', 'hvb', 'hvr']) {
     const token = `${prefix}.` + 'Ab3_'.repeat(8);
