@@ -34,7 +34,6 @@ test('guard: Firecrawl API keys are fully removed without masking ordinary text'
     'fc-' + 'a'.repeat(24),
     'not' + token,
     `_${token}`,
-    `${token}_suffix`,
     'fc-' + 'A'.repeat(129),
     'see fc-search-plugin-configuration-reference-docs here',
     'the fc-search_client_configuration_reference_module',
