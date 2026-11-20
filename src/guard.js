@@ -75,6 +75,10 @@ const SECRET_RULES = [
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
   ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
+  // App-level (Socket Mode) tokens have a version, Slack app ID, numeric ID and
+  // long secret; rotating access tokens add xoxe. No upper bound: oversized
+  // credentials must still be removed rather than leaked.
+  ['Slack app-level token', /(?<![A-Za-z0-9_.-])(?:xoxe\.)?xapp-[0-9]+-A[A-Z0-9]{6,}-[0-9]{10,}-[A-Za-z0-9]{32,}(?![A-Za-z0-9_-])/g],
   ['Slack incoming webhook URL', /(?<![A-Za-z0-9._-])https:\/\/hooks\.(?:slack|slack-gov)\.com\/services\/[TE][A-Z0-9]{8,20}\/B[A-Z0-9]{8,20}\/[A-Za-z0-9]{24,128}(?![A-Za-z0-9_-])/gi],
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   // Webhook endpoint signing secrets are separate from Stripe API keys.
