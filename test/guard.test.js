@@ -343,6 +343,50 @@ test('guard: redacts Grafana service account tokens without masking lookalikes',
   ]) assert.deepEqual(inspect(lookalike).secrets, [], lookalike.slice(0, 80));
 });
 
+test('guard: Tailscale API, auth, client, SCIM and webhook keys are redacted', () => {
+  // Key-shaped synthetic strings, never live credentials.
+  for (const type of ['api', 'auth', 'client', 'scim', 'webhook']) {
+    const token = `tskey-${type}-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(5)}`;
+    for (const input of [token, `Tailscale key: ${token}`, `Bearer ${token}`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['Tailscale key']);
+      assert.equal(result.text, input.replace(token, '[Tailscale key removed]'));
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
+  }
+
+  // No upper bound: over-long credentials must be removed in full.
+  for (const overlongToken of [
+    `tskey-api-${'Ab3x'.repeat(9)}-${'C4dE'.repeat(5)}`, // first segment > 32
+    `tskey-auth-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(33)}`, // second segment > 128
+    `tskey-scim-${'Ab3x'.repeat(40)}-${'C4dE'.repeat(40)}`, // both segments over-long
+    `tskey-webhook-${'a'.repeat(8)}-${'b'.repeat(11)}Z`, // uppercase at the end
+  ]) {
+    const input = `Tailscale: ${overlongToken} ready`;
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Tailscale key'], overlongToken);
+    assert.equal(result.text, 'Tailscale: [Tailscale key removed] ready', 'must redact the complete credential');
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  const token = `tskey-api-${'Ab3x'.repeat(3)}-${'C4dE'.repeat(5)}`;
+  for (const ordinary of [
+    'Tailscale keys begin with tskey-api-',
+    'tskey-api-authentication-configuration',
+    `tskey-api-${'A'.repeat(12)}-${'b'.repeat(20)}`,
+    `tskey-webhook-${'Ab3x'.repeat(3)}-${'c'.repeat(20)}`,
+    `tskey-api-${'A'.repeat(7)}-${'B'.repeat(20)}`,
+    `tskey-api-${'A'.repeat(12)}-${'B'.repeat(11)}`,
+    `tskey-unknown-${'A'.repeat(12)}-${'B'.repeat(20)}`,
+    `prefix_${token}`,
+    `${token}_suffix`,
+  ]) {
+    const result = inspect(ordinary);
+    assert.deepEqual(result.secrets, [], ordinary);
+    assert.equal(result.text, ordinary);
+  }
+});
+
 test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
   const token = 'ntn_' + '12345678901' + 'Ab3'.repeat(11) + 'Cd';
   for (const input of [token, `connect using ${token}`, `Authorization: Bearer ${token}`]) {
