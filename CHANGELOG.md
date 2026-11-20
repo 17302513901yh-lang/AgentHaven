@@ -5,6 +5,8 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **Guard redacts NVIDIA NGC personal API keys** (`nvapi-` with a mixed-case body), without masking lowercase kebab-case or snake_case names after the prefix. Thanks to @jdotc1! (#131)
+- **Guard redacts Slack app-level tokens, PostHog private tokens, Resend API keys, Tailscale keys, GitLab deploy tokens and Firecrawl API keys** (`xapp-` and `xoxe.xapp-` with the full versioned structure, `phx_`/`phs_`/`pha_`/`phr_` base57 tokens, `re_`, `tskey-` typed keys, `gldt-` and `fc-`), without masking lowercase kebab-case or snake_case names after the prefix. Thanks to @jdotc1! (#108, #111, #132, #133, #141, #143)
 - **Guard no longer stalls on long hyphen-heavy text:** the connection string password rule backtracked heavily on inputs such as 150,000 characters of `aB-` repeated (several seconds). The URI scheme is now length-bounded and the rule is skipped when the text contains no `://`; long passwords and user names are still redacted. Thanks to @purushothaman-web! (#148, #149)
 - **Guard redacts Docker Hub access tokens, Vercel API credentials and Databricks personal access tokens** (`dckr_pat_`/`dckr_oat_`, the five `vc*_` Vercel prefixes and `dapi` plus 32 hex digits), without masking snake_case or kebab-case names or identifiers that only contain the prefix. Thanks to @jdotc1! (#105, #142, #144)
 - **Guard redacts GitLab runner authentication tokens** (`glrt-` and `glrtr-` with a 20 to 128 character body), without masking shorter strings or identifiers that only contain the prefix. Thanks to @jdotc1! (#123)
