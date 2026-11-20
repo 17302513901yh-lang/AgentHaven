@@ -24,6 +24,12 @@ function isDiscordBotToken(token) {
   return /^\d{17,20}$/.test(id) && Buffer.from(id).toString('base64url') === encodedId;
 }
 
+// PostHog-generated credentials are random base57 strings, not prose. Avoid
+// altering ordinary lowercase identifiers even if they are unusually long.
+function isPostHogPrivateToken(token) {
+  return /[2-9A-HJ-NP-Z]/.test(token.slice(4));
+}
+
 const SECRET_RULES = [
   ['private key', /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z ]+ )?PRIVATE KEY-----|$)/g],
   ['Anthropic key', /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
@@ -83,6 +89,10 @@ const SECRET_RULES = [
   ['Stripe key', /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{20,}/g],
   // Webhook endpoint signing secrets are separate from Stripe API keys.
   ['Stripe webhook secret', /(?<![A-Za-z0-9_])whsec_[A-Za-z0-9]{20,128}(?![A-Za-z0-9_])/g],
+  // PostHog generates base57 bodies: 48 chars for phx_/phs_, 44 for pha_/phr_.
+  // No upper bound: an oversized credential-like string must not be left exposed.
+  // phc_ project keys are public and deliberately excluded.
+  ['PostHog private token', /(?<![A-Za-z0-9_-])(?:(?:phx|phs)_[2-9A-HJ-NP-Za-km-z]{48,}|(?:pha|phr)_[2-9A-HJ-NP-Za-km-z]{44,})(?![A-Za-z0-9_-])/g, isPostHogPrivateToken],
   ['Hugging Face token', /\bhf_[A-Za-z0-9]{30,}/g],
   ['npm token', /\bnpm_[A-Za-z0-9]{36}\b/g],
   // Use the scanner-observed token shape, not a broad prefix that eats identifiers.

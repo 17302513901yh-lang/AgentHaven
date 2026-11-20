@@ -981,3 +981,44 @@ test('guard: connection string password rule bounds scan time on long hyphen-hea
     assert.ok(durationMs < 500, `connection string rule took ${durationMs.toFixed(1)} ms, expected < 500 ms`);
   }
 });
+
+test('guard: redacts generated-format PostHog secrets without masking prose', () => {
+  const marker = '[PostHog private token removed]';
+  // PostHog uses 35 bytes (48 base57 chars) for personal/project secrets,
+  // and 32 bytes (44 base57 chars) for OAuth access/refresh tokens.
+  for (const [prefix, bodyLength] of [['phx', 48], ['phs', 48], ['pha', 44], ['phr', 44]]) {
+    const token = `${prefix}_${'Ab3x'.repeat(bodyLength / 4)}`;
+    for (const input of [token, `PostHog credential: ${token} done`, `key=${token}\nnext`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['PostHog private token'], prefix);
+      assert.equal(result.text, input.replace(token, marker), prefix);
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
+    // Do not silently leak an oversized token just because it exceeds an upper limit.
+    const oversized = `${prefix}_${'A'.repeat(129)}`;
+    assert.equal(inspect(oversized).text, marker, prefix);
+  }
+
+  const privateToken = `phx_${'Ab3x'.repeat(12)}`;
+  for (const ordinary of [
+    `phc_${'Ab3x'.repeat(12)}`, // public project token
+    `phx_${'Ab3x'.repeat(11)}`, // below personal-key length
+    `phs_${'Ab3x'.repeat(11)}`,
+    `pha_${'Ab3x'.repeat(10)}Ab3`, // below OAuth length
+    `phr_${'Ab3x'.repeat(10)}Ab3`,
+    'see phs_patient_health_summary_v2 table',
+    'column pha_inventory_report_2024 here',
+    'phr_quarterly_revenue_breakdown_final',
+    `phs_${'a'.repeat(100)}`, // lowercase prose-like name
+    `phx_${'a'.repeat(150_000)}`,
+    `phx_${'Ab3x'.repeat(12)}_suffix`,
+    `phs_${'Ab3x'.repeat(12)}-suffix`,
+    `phx_${'Ab3x'.repeat(12)}0`, // 0 is outside PostHog's base57 alphabet
+    `prefix_${privateToken}`,
+  ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+
+  const longToken = `phx_${'A'.repeat(150_000)}`;
+  const started = process.hrtime.bigint();
+  assert.equal(inspect(longToken).text, marker);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'PostHog scan exceeded 500 ms');
+});
