@@ -777,6 +777,8 @@ test('guard: redacts Authorization header credentials without false positives', 
   for (const [input, expected] of [
     [`Authorization: Bearer ${credential}`, 'Authorization: Bearer [authorization token removed]'],
     [`authorization: token ${credential}`, 'authorization: token [authorization token removed]'],
+    ['Authorization: Bearer short', 'Authorization: Bearer [authorization token removed]'],
+    ['Authorization: Token abcdefghijklmno', 'Authorization: Token [authorization token removed]'],
     [`-H 'Authorization: Basic ${credential}=' https://api.example.com`, "-H 'Authorization: Basic [authorization token removed]' https://api.example.com"],
     [`curl -H "Authorization: Bearer ${credential}" https://api.example.com`, 'curl -H "Authorization: Bearer [authorization token removed]" https://api.example.com'],
   ]) {
@@ -787,8 +789,6 @@ test('guard: redacts Authorization header credentials without false positives', 
   }
   for (const ordinary of [
     'Use a Bearer token in the Authorization header',
-    'Authorization: Bearer short',
-    'Authorization: Token abcdefghijklmno', // one character below the detection threshold
     'Authorization: Bearer \nnext line',
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
 
