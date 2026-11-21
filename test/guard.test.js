@@ -1174,3 +1174,23 @@ test('guard: redacts generated-format PostHog secrets without masking prose', ()
   assert.equal(inspect(longToken).text, marker);
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'PostHog scan exceeded 500 ms');
 });
+
+test('guard: redact Google OAuth client secrets as complete tokens', () => {
+  const token = 'GOCSPX-' + 'Ab3x'.repeat(7); // Synthetic 28-character body.
+  for (const input of [token, `client secret: ${token} ready`, `"${token}"`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Google OAuth client secret']);
+    assert.equal(result.text, input.replace(token, '[Google OAuth client secret removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction is idempotent');
+  }
+  for (const ordinary of [
+    'GOCSPX- is the Google OAuth client-secret prefix',
+    'GOCSPX-' + 'a'.repeat(27),
+    'GOCSPX-' + 'a'.repeat(29),
+    'prefix_' + token,
+    token + '_suffix',
+    'GOCSPX-' + 'a'.repeat(100_000),
+  ]) {
+    assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
+  }
+});
