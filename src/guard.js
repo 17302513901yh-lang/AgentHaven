@@ -125,6 +125,11 @@ const SECRET_RULES = [
   ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*["']?)((?!\[)(?:\\.|[^\s"'`,;\\]){6,})/gi],
 ];
 
+// Terminal escape sequences can hide or overwrite text in CLI readers and logs.
+// Strip complete CSI/OSC sequences, including OSC hyperlinks, before inspection.
+// An unterminated OSC is removed through the current line rather than stored.
+const TERMINAL_ESCAPE = /\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b\r\n]*(?:\x07|\x1b\\|(?=\r?\n|$))|[^\r\n]?)/g;
+
 // Zero-width and bidi controls, and the Unicode "tag" block used to hide text from people.
 const INVISIBLE = /[\u200B\u200C\u200E\u200F\u202A-\u202E\u2060-\u2064\u2066-\u2069\uFEFF]|[\u{E0000}-\u{E007F}]/gu;
 // Preserve these characters in stored text (notably emoji/script joiners), but
@@ -168,6 +173,8 @@ const INJECTION_RULES = [
 function inspect(input) {
   if (typeof input !== 'string' || !input) return { text: input, secrets: [], injection: [], invisible: 0 };
   let text = input;
+  const terminalEscapes = (text.match(TERMINAL_ESCAPE) || []).length;
+  if (terminalEscapes) text = text.replace(TERMINAL_ESCAPE, '');
   const secrets = [];
   const invisible = (text.match(INVISIBLE) || []).length;
   if (invisible) text = text.replace(INVISIBLE, '');
@@ -189,6 +196,7 @@ function inspect(input) {
   if (injection.length && injectionText !== text) {
     injection.push('contained invisible characters that can hide instructions');
   }
+  if (terminalEscapes) injection.push(`contained ${terminalEscapes} terminal escape sequence(s) that can obscure agent context`);
   if (invisible) injection.push(`contained ${invisible} invisible character(s) that can hide instructions`);
   return { text, secrets: [...new Set(secrets)], injection };
 }
