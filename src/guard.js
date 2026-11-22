@@ -93,6 +93,10 @@ const SECRET_RULES = [
   ['Cloudflare API credential', /(?<![A-Za-z0-9_-])(?:cfk|cfut|cfat)_[A-Za-z0-9]{40}[0-9a-fA-F]{8}(?![A-Za-z0-9_-])/g],
   ['Linear API key', /(?<![A-Za-z0-9_])lin_api_[A-Za-z0-9]{40}(?![A-Za-z0-9_])/g],
   ['DigitalOcean token', /(?<![A-Za-z0-9_])(?:dop|doo|dor)_v1_[0-9a-f]{64}(?![A-Za-z0-9_])/g],
+  // Doppler publishes strict formats for its CLI, personal, service, service
+  // account, identity, SCIM and audit tokens; service tokens may include an
+  // environment segment. Require full tokens, never match a token prefix.
+  ['Doppler authentication token', /(?<![A-Za-z0-9_.-])dp\.(?:(?:ct|pt|sa|said|scim|audit)\.|st\.(?:[a-z0-9_-]{2,35}\.)?)[A-Za-z0-9]{40,44}(?![A-Za-z0-9_.-])/g],
   // Databricks documents dapi-prefixed personal access tokens with 32 hex digits.
   ['Databricks personal access token', /(?<![A-Za-z0-9_-])dapi[0-9a-fA-F]{32}(?![A-Za-z0-9_-])/g],
   // NVIDIA NGC personal API keys use the nvapi- prefix. Require an uppercase
