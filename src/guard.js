@@ -135,6 +135,9 @@ const SECRET_RULES = [
   ['LangSmith API key', /(?<![A-Za-z0-9_-])lsv2_(?:pt|sk)_(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,256}(?![A-Za-z0-9_-])/g],
   // PyPI macaroons use pypi- followed by at least 85 base64url characters.
   ['PyPI token', /(?<![A-Za-z0-9_-])pypi-[A-Za-z0-9_-]{85,}(?![A-Za-z0-9_-])/g],
+  // Cookie and Set-Cookie headers can carry session credentials that are too
+  // short or low-entropy for a generic token detector. Preserve the header name.
+  ['HTTP cookie header', /^([ \t]*(?:Cookie|Set-Cookie)[ \t]*:[ \t]*)(?=[^=;\r\n \t]+=[^\r\n]+)[^\r\n]+/gmi],
   ['JWT', /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g],
   // Redact the value, not the closing quote; the normal password replacement
   // then preserves both delimiters even for spaces and escaped quotes.
@@ -202,6 +205,7 @@ function inspect(input) {
       if (kind === 'password') return `${m[1]}[secret removed]`;
       if (kind === 'connection string password') return `${m[1]}[secret removed]${m[3]}`;
       if (kind === 'authorization token') return `${m[1]}[authorization token removed]`;
+      if (kind === 'HTTP cookie header') return `${m[1]}[cookie value removed]`;
       if (kind === 'Azure Storage account key') return `${m[1]}[Azure Storage account key removed]`;
       return `[${kind} removed]`;
     });
