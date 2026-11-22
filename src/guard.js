@@ -116,13 +116,13 @@ const SECRET_RULES = [
   ['JWT', /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/g],
   // Redact the value, not the closing quote; the normal password replacement
   // then preserves both delimiters even for spaces and escaped quotes.
-  ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*(["'`]))(?!\[secret removed\]\2)(?:\\.|(?!\2)[^\\\r\n]){6,}(?=\2)/gi],
+  ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret[_-]?access[_-]?key|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*(["'`]))(?!\[secret removed\]\2)(?:\\.|(?!\2)[^\\\r\n]){6,}(?=\2)/gi],
   // Bounded URI scheme avoids catastrophic backtracking on hyphen-heavy input while keeping credential length unbounded.
   ['connection string password', /\b([a-z][a-z0-9+.-]{0,63}:\/\/[^\s:/@]+:)([^\s@/]{3,})(@)/gi],
   // Run after provider patterns to avoid double-reporting recognized tokens.
   ['authorization token', /\b(Authorization[ \t]*:[ \t]*(?:Bearer|Token|Basic)[ \t]+)([A-Za-z0-9._~+/=-]{16,})(?![A-Za-z0-9._~+/=-])/gi],
   // Also inside names like DB_PASSWORD or OPENAI_API_KEY (an underscore is no word boundary).
-  ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*["']?)((?!\[)(?:\\.|[^\s"'`,;\\]){6,})/gi],
+  ['password', /(?<![A-Za-z0-9])((?:password|passwd|pwd|secret[_-]?access[_-]?key|secret|api[_-]?key|access[_-]?token|auth[_-]?token|client[_-]?secret)["']?\s*[:=]\s*["']?)((?!\[)(?:\\.|[^\s"'`,;\\]){6,})/gi],
 ];
 
 // Zero-width and bidi controls, and the Unicode "tag" block used to hide text from people.
