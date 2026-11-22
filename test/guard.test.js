@@ -117,6 +117,37 @@ test('guard: xAI API keys are redacted without masking ordinary text', () => {
   ]) assert.deepEqual(inspect(ordinary).secrets, [], ordinary.slice(0, 80));
 });
 
+test('guard: Tavily API keys are redacted before reaching shared agent memory', () => {
+  const token = 'tvly-' + 'Ab3x'.repeat(10);
+  for (const input of [token, `Use ${token} for search`, `Bearer ${token}`]) {
+    const result = inspect(input);
+    assert.deepEqual(result.secrets, ['Tavily API key']);
+    assert.equal(result.text, input.replace(token, '[Tavily API key removed]'));
+    assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+  }
+
+  for (const ordinary of [
+    'tvly-search-plugin',
+    'tvly-' + 'a'.repeat(31),
+    'tvly-' + 'A'.repeat(129),
+    `prefix_${token}`,
+    `prefix${token}`,
+    'tvly_' + 'A'.repeat(40),
+    'see tvly-search-plugin-configuration-reference-docs table',
+    'the tvly-search_client_configuration_reference_module module',
+    'see tvly-rotate-ci-token-for-release-2024-notes here',
+    'tvly-web-search-agent-integration-guide-for-tavily',
+  ]) {
+    const result = inspect(ordinary);
+    assert.deepEqual(result.secrets, [], ordinary.slice(0, 80));
+    assert.equal(result.text, ordinary, 'ordinary identifier must be preserved');
+  }
+
+  const started = process.hrtime.bigint();
+  assert.deepEqual(inspect('tvly-' + 'A'.repeat(150_000)).secrets, []);
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'Tavily pattern exceeded 500 ms');
+});
+
 test('guard: Resend API keys are redacted without masking ordinary identifiers', () => {
   const token = 're_' + 'Ab3x'.repeat(8);
   for (const candidate of [token, 're_' + 'a'.repeat(23) + 'Z']) {

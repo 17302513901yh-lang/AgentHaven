@@ -41,6 +41,9 @@ const SECRET_RULES = [
   ['Groq key', /\bgsk_[A-Za-z0-9]{30,}\b/g],
   // xAI documents the xai- prefix; bound the opaque payload to avoid partial matches.
   ['xAI API key', /(?<![A-Za-z0-9_-])xai-[A-Za-z0-9_-]{24,128}(?![A-Za-z0-9_-])/g],
+  // Tavily documents the tvly- prefix; require a bounded payload with uppercase
+  // as a heuristic to avoid masking ordinary lowercase identifiers.
+  ['Tavily API key', /(?<![A-Za-z0-9_-])tvly-(?=[A-Za-z0-9_-]{0,127}[A-Z])[A-Za-z0-9_-]{32,128}(?![A-Za-z0-9_-])/g],
   // Resend keys have a re_ prefix; uppercase avoids lowercase snake_case identifiers.
   // No maximum length: unusually long credentials must also be redacted.
   ['Resend API key', /(?<=^|[^A-Za-z0-9_-])re_(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,}(?=[^A-Za-z0-9_-]|$)/g],
