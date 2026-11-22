@@ -13,6 +13,24 @@ const tmpStore = () => new Store({ dataDir: fs.mkdtempSync(path.join(os.tmpdir()
 const fakeDiscordToken = (signature = 'Z'.repeat(27), id = '123456789012345678') =>
   `${Buffer.from(id).toString('base64url')}.AbC_-7.${signature}`;
 
+test('guard: secret access key assignments cannot escape shared-memory redaction', () => {
+  const token = 'Ab3x'.repeat(10); // Synthetic AWS-style secret value.
+  for (const [input, expected] of [
+    [`AWS_SECRET_ACCESS_KEY=${token}`, 'AWS_SECRET_ACCESS_KEY=[secret removed]'],
+    [`AWS_SECRET_ACCESS_KEY="${token}"`, 'AWS_SECRET_ACCESS_KEY="[secret removed]"'],
+    [`AWS_SECRET_ACCESS_KEY='${token}'`, "AWS_SECRET_ACCESS_KEY='[secret removed]'"],
+    ['AWS_SECRET_ACCESS_KEY="correct horse battery"', 'AWS_SECRET_ACCESS_KEY="[secret removed]"'],
+  ]) {
+    const scanned = inspect(input);
+    assert.equal(scanned.text, expected, input);
+    assert.deepEqual(scanned.secrets, ['password']);
+    assert.deepEqual(inspect(scanned.text).secrets, [], 'redaction must be idempotent');
+  }
+  for (const ordinary of ['Set AWS_SECRET_ACCESS_KEY in production', 'Secret access key rotation is scheduled']) {
+    assert.deepEqual(inspect(ordinary).secrets, [], ordinary);
+  }
+});
+
 test('guard: Firecrawl API keys are fully removed without masking ordinary text', () => {
   for (const token of [
     'fc-' + 'Ab3x'.repeat(9),
