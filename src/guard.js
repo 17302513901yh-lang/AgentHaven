@@ -92,6 +92,9 @@ const SECRET_RULES = [
   // boundary in front: in an API URL the token follows `bot` directly.
   ['Telegram bot token', /(?<!\d)\d{8,10}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g],
   ['AWS access key', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
+  // Cloud Storage V4 signed URLs carry HMAC (64 hex) or longer RSA
+  // signatures that grant temporary object access without other credentials.
+  ['Google Cloud Storage signed URL signature', /(?<=X-Goog-Signature=)[a-f0-9]{64,1024}(?![A-Za-z0-9_%])/gi],
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
   ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
