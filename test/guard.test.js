@@ -493,6 +493,43 @@ test('guard: Tailscale API, auth, client, SCIM and webhook keys are redacted', (
   }
 });
 
+test('guard: LangSmith personal and service keys are redacted without masking identifiers', () => {
+  for (const kind of ['pt', 'sk']) {
+    const prefix = `lsv2_${kind}_`;
+    const token = prefix + 'Ab3x'.repeat(9);
+    for (const input of [token, `LangSmith: ${token} ready`]) {
+      const result = inspect(input);
+      assert.deepEqual(result.secrets, ['LangSmith API key']);
+      assert.equal(result.text, input.replace(token, '[LangSmith API key removed]'));
+      assert.deepEqual(inspect(result.text).secrets, [], 'redaction must be idempotent');
+    }
+    // Uppercase at the end of the body must still be recognized.
+    assert.deepEqual(inspect(prefix + 'a'.repeat(39) + 'Z').secrets, ['LangSmith API key']);
+    for (const ordinary of [
+      prefix + 'a'.repeat(23),
+      prefix + 'a'.repeat(24),
+      prefix + 'a'.repeat(256),
+      prefix + 'a'.repeat(257),
+      prefix + 'A'.repeat(257),
+      'prefix_' + token,
+      prefix + 'search-plugin-configuration-reference-docs',
+      prefix + 'search_client_configuration_reference_module',
+      prefix + 'rotate-ci-token-for-release-2024-notes',
+    ]) {
+      const result = inspect(ordinary);
+      assert.deepEqual(result.secrets, [], ordinary.slice(0, 80));
+      assert.equal(result.text, ordinary, 'ordinary identifiers must remain unchanged');
+    }
+    assert.equal(inspect(token + '_suffix').text, '[LangSmith API key removed]');
+  }
+  assert.deepEqual(inspect('lsv2_unknown_' + 'a'.repeat(36)).secrets, []);
+  const started = process.hrtime.bigint();
+  for (const ch of ['a', 'A']) {
+    assert.deepEqual(inspect('lsv2_pt_' + ch.repeat(150_000)).secrets, []);
+  }
+  assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500, 'LangSmith pattern exceeded 500 ms');
+});
+
 test('guard: Notion integration tokens are removed without catching ordinary identifiers', () => {
   const token = 'ntn_' + '12345678901' + 'Ab3'.repeat(11) + 'Cd';
   for (const input of [token, `connect using ${token}`, `Authorization: Bearer ${token}`]) {
