@@ -30,6 +30,11 @@ function isPostHogPrivateToken(token) {
   return /[2-9A-HJ-NP-Z]/.test(token.slice(4));
 }
 
+// Telegram bot identifiers may extend to 16 decimal digits, but are limited to 52 bits.
+function isTelegramBotToken(token) {
+  return BigInt(token.split(':', 1)[0]) < (1n << 52n);
+}
+
 const SECRET_RULES = [
   ['private key', /-----BEGIN (?:[A-Z ]+ )?PRIVATE KEY-----[\s\S]*?(?:-----END (?:[A-Z ]+ )?PRIVATE KEY-----|$)/g],
   ['Anthropic key', /\bsk-ant-[A-Za-z0-9_-]{20,}/g],
@@ -103,9 +108,9 @@ const SECRET_RULES = [
   // payload character to avoid redacting ordinary lowercase identifiers.
   ['NVIDIA NGC API key', /(?<![A-Za-z0-9_-])nvapi-(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{24,}(?![A-Za-z0-9_-])/g],
   ['Shopify token', /(?<![A-Za-z0-9_])(?:shpat|shpca|shppa|shpss)_[0-9a-fA-F]{32}(?![A-Za-z0-9_])/g],
-  // Telegram bot tokens are 8-10 digits, a colon and 35 characters. No word
+  // Telegram bot tokens contain an 8-16-digit ID (within 52 bits), a colon and 35 characters. No word
   // boundary in front: in an API URL the token follows `bot` directly.
-  ['Telegram bot token', /(?<!\d)\d{8,10}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g],
+  ['Telegram bot token', /(?<!\d)\d{8,16}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g, isTelegramBotToken],
   ['AWS access key', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
   // Google OAuth client secrets have a GOCSPX- prefix and 28 opaque characters.
