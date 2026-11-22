@@ -112,6 +112,9 @@ const SECRET_RULES = [
   // boundary in front: in an API URL the token follows `bot` directly.
   ['Telegram bot token', /(?<!\d)\d{8,16}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g, isTelegramBotToken],
   ['AWS access key', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
+  // Cloud Storage V4 signed URLs carry HMAC (64 hex) or longer RSA
+  // signatures that grant temporary object access without other credentials.
+  ['Google Cloud Storage signed URL signature', /(?<=X-Goog-Signature=)[a-f0-9]{64,1024}(?![A-Za-z0-9_%])/gi],
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
   // Google OAuth client secrets have a GOCSPX- prefix and 28 opaque characters.
   // Require token boundaries so no partial credentials are marked as removed.
