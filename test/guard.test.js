@@ -273,6 +273,39 @@ test('guard: redacts Cloudflare API credentials with strict shape and boundaries
   assert.ok(Number(process.hrtime.bigint() - started) / 1e6 < 500);
 });
 
+test('guard: redacts GitLab CI job tokens in legacy and JWT forms', () => {
+  const legacy = 'glcbt-' + 'Ab3_'.repeat(8);
+  const jwt = 'glcbt-' + ['eyJ0eXAiOiJKV1QifQ', 'eyJpc3MiOiJnaXRsYWIiLCJzdWIiOiJ1c2VyIn0', 'Ab3_'.repeat(12)].join('.');
+  const customized = 'acme-glcbt-' + 'Ab3_'.repeat(8);
+  for (const token of [legacy, jwt, customized]) {
+    for (const raw of [token, `job token: ${token} ready`, `CI_JOB_TOKEN=${token}`]) {
+      const result = inspect(raw);
+      assert.deepEqual(result.secrets, ['GitLab CI job token'], raw.slice(0, 80));
+      assert.ok(!result.text.includes(token), 'never retain a token fragment');
+      assert.equal(inspect(result.text).secrets.length, 0, 'redaction is idempotent');
+    }
+  }
+});
+
+test('guard: GitLab CI token near misses and embedded identifiers are not partially redacted', () => {
+  const legacy = 'glcbt-' + 'Ab3_'.repeat(8);
+  for (const text of [
+    'glcbt- is the documented prefix',
+    'glcbt-' + 'A'.repeat(19),
+    'prefix_' + legacy,
+    legacy + '.extra',
+    'glcbt-' + 'Ab3_'.repeat(3) + '!',
+    'glcbt-abc.def.ghi',
+    'see glcbt-search-plugin-configuration-reference-docs here',
+    'the glcbt-search_client_configuration_reference_module',
+    'see glcbt-rotate-ci-token-for-release-2024-notes here'
+  ]) {
+    const result = inspect(text);
+    assert.deepEqual(result.secrets, [], text.slice(0, 80));
+    assert.equal(result.text, text, 'ordinary identifiers must remain unchanged');
+  }
+});
+
 test('guard: redacts GitLab runner authentication tokens without masking identifiers', () => {
   for (const prefix of ['glrt', 'glrtr']) {
     const token = `${prefix}-${'Ab3d'.repeat(8)}`;

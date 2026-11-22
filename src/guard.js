@@ -74,6 +74,11 @@ const SECRET_RULES = [
   ['Discord webhook URL', /\bhttps:\/\/(?:discord|discordapp)\.com\/api(?:\/v\d{1,2})?\/webhooks\/\d{17,20}\/[A-Za-z0-9_-]{30,128}(?![A-Za-z0-9_-])/g],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
+  // GitLab CI job tokens grant scoped access while a pipeline runs.
+  // Handle both legacy opaque tokens and the newer three-segment JWT form;
+  // an optional bounded instance prefix is part of the credential.
+  // Requiring uppercase in the token body is a heuristic, not a format guarantee.
+  ['GitLab CI job token', /(?<![A-Za-z0-9_-])(?:[A-Za-z0-9][A-Za-z0-9_-]{1,31}-)?glcbt-(?=[A-Za-z0-9_.-]*[A-Z])(?:[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|[A-Za-z0-9_-]{20,128})(?![A-Za-z0-9_.-])/g],
   ['GitLab runner authentication token', /(?<![A-Za-z0-9_-])(?:glrt|glrtr)-[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])/g],
   // GitLab deploy tokens have a distinct prefix. Requiring uppercase is a
   // heuristic to avoid lowercase identifiers, not a guarantee of token format.
