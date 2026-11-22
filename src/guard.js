@@ -108,6 +108,9 @@ const SECRET_RULES = [
   ['Telegram bot token', /(?<!\d)\d{8,10}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g],
   ['AWS access key', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
   ['Google API key', /\bAIza[0-9A-Za-z_-]{35}\b/g],
+  // Google OAuth client secrets have a GOCSPX- prefix and 28 opaque characters.
+  // Require token boundaries so no partial credentials are marked as removed.
+  ['Google OAuth client secret', /(?<![A-Za-z0-9_-])GOCSPX-[A-Za-z0-9_-]{28}(?![A-Za-z0-9_-])/g],
   ['Azure Storage account key', /(?<![A-Za-z0-9_])(AccountKey[ \t]*=[ \t]*)[A-Za-z0-9+/]{86}==(?=[^A-Za-z0-9+/=]|$)/gi],
   ['Slack token', /\bxox[abposr]-[A-Za-z0-9-]{10,}/g],
   // App-level (Socket Mode) tokens have a version, Slack app ID, numeric ID and
