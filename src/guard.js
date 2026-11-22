@@ -80,6 +80,9 @@ const SECRET_RULES = [
   // Requiring uppercase in the token body is a heuristic, not a format guarantee.
   ['GitLab CI job token', /(?<![A-Za-z0-9_-])(?:[A-Za-z0-9][A-Za-z0-9_-]{1,31}-)?glcbt-(?=[A-Za-z0-9_.-]*[A-Z])(?:[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}|[A-Za-z0-9_-]{20,128})(?![A-Za-z0-9_.-])/g],
   ['GitLab runner authentication token', /(?<![A-Za-z0-9_-])(?:glrt|glrtr)-[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])/g],
+  // GitLab pipeline trigger tokens use the distinct glptt- prefix. Require
+  // a mixed-case opaque payload to avoid masking identifiers from docs.
+  ['GitLab pipeline trigger token', /(?<![A-Za-z0-9_-])glptt-(?=[A-Za-z0-9_-]{0,127}[A-Z])[A-Za-z0-9_-]{20,128}(?![A-Za-z0-9_-])/g],
   // GitLab deploy tokens have a distinct prefix. Requiring uppercase is a
   // heuristic to avoid lowercase identifiers, not a guarantee of token format.
   ['GitLab deploy token', /(?<=^|[^A-Za-z0-9_-])gldt-(?=[A-Za-z0-9_-]*[A-Z])[A-Za-z0-9_-]{20,128}(?=[^A-Za-z0-9_-]|$)/g],
