@@ -5,6 +5,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **The README opening, Quickstart and "Why AgentHaven" table in Spanish** (`docs/translations/README.es.md`), with the English README commit it was translated from and a link from the English README. Thanks to @Daiyuanranfeng! (#51, #177)
 - **Agents can no longer release or remove quarantined notes through the HTTP API:** an agent that sent `X-AgentHaven-Agent: you` could release its own quarantined note. The release and remove routes now refuse any request that carries the agent header, so only the person at the dashboard decides. Thanks to @jdotc1! (#165)
 - **Guard strips terminal control sequences from shared memory:** CSI and OSC sequences, including OSC 8 hyperlinks and screen clears, are removed before text is stored and the text is flagged, while ordinary Unicode, emoji and plain text stay unchanged. Thanks to @jdotc1! (#166)
 - **Guard redacts Tavily, LangSmith, GitLab CI job and pipeline trigger, Doppler and Google OAuth client credentials** (`tvly-`, `lsv2_pt_`/`lsv2_sk_`, `glcbt-`, `glptt-`, the typed `dp.` tokens and `GOCSPX-`), without masking lowercase kebab-case or snake_case names after the prefix. Thanks to @jdotc1! (#139, #146, #151, #155, #156, #159)
