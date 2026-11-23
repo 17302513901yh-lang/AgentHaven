@@ -12,6 +12,10 @@
 </p>
 
 <p align="center">
+  Español: <a href="docs/translations/README.es.md">README.es.md</a>
+</p>
+
+<p align="center">
   <a href="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/laaielichter/AgentHaven/actions/workflows/ci.yml/badge.svg"></a>
   <a href="https://github.com/laaielichter/AgentHaven/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/laaielichter/AgentHaven?include_prereleases&label=release"></a>
   <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
