@@ -106,3 +106,15 @@ test('status and board refuse an unknown workspace, default stays usable', () =>
   assert.equal(envBad.status, 1);
   assert.match(envBad.stderr, /no workspace named "mian"; existing workspaces: default, main/);
 });
+
+test('<command> --help and -h print the usage without running the command (#179)', () => {
+  const { home, share, run } = fixture();
+  for (const args of [['status', '--help'], ['serve', '--help'], ['connect', '-h'], ['link', share, '--help'], ['board', '-h']]) {
+    const res = run(...args);
+    assert.equal(res.status, 0, `${args.join(' ')} exits 0`);
+    assert.match(res.stdout, /^AgentHaven — one shared work board/, `${args.join(' ')} prints the usage`);
+    assert.doesNotMatch(res.stdout, /Board: \d+ to do/, `${args.join(' ')} does not run the command`);
+  }
+  assert.ok(!fs.existsSync(path.join(share, 'WORKBOARD.md')), 'link --help did not link the folder');
+  assert.deepEqual(fs.readdirSync(home), [], 'nothing was written to AGENTHAVEN_HOME');
+});

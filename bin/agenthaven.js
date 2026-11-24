@@ -86,6 +86,14 @@ X-AgentHaven-Agent: <name> (see examples/report_progress.py).
 
 Data is stored in ${defaultDataDir()} (override with AGENTHAVEN_HOME).`;
 
+// `agenthaven <command> --help` (or -h) prints the usage and stops, before the
+// command reads or writes anything: people ask for help to learn what a command
+// does before they run it (#179). `hook` is left alone, as above.
+if (cmd !== 'hook' && (has('help') || args.includes('-h'))) {
+  console.log(HELP);
+  process.exit(0);
+}
+
 const store = () => new Store({ workspace });
 const linkedDir = (s) => s.getSettings().workboardDir || fail(`workspace "${workspace}" is not linked to a folder; run: agenthaven link <folder>`);
 // `status` and `board` only read the board. Without this check a misspelled
