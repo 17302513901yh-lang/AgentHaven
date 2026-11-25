@@ -8,21 +8,24 @@ const { Store } = require('../src/store');
 const { createHandler, vendorOf } = require('../src/mcp');
 const { start } = require('../src/server');
 const wb = require('../src/workboard');
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const tmpDir = (p = 'ah-') => fs.mkdtempSync(path.join(os.tmpdir(), p));
 const tmpStore = (opts = {}) => new Store({ dataDir: tmpDir(), ...opts });
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
 
 test('leases: a quiet agent loses its claim, a heartbeat keeps it', async () => {
-  // Wide margins: Windows CI spends hundreds of ms on file locks and renames alone.
-  const s = tmpStore({ leaseMs: 2000 });
+  let time = Date.now();
+  const s = tmpStore({ leaseMs: 2000, now: () => time });
   const a = s.createTask({ title: 'A', files: ['src/a.js'], actor: 'x' });
   const b = s.createTask({ title: 'B', actor: 'x' });
   s.claimTask(a.id, { actor: 'claude' });
   s.claimTask(b.id, { actor: 'codex' });
-  await sleep(1200); // both leases still valid (2000 ms)
-  s.heartbeat({ actor: 'codex' }); // codex now runs until ~3200 ms
-  await sleep(1200); // claude's lease ended at ~2000 ms; codex has ~800 ms to spare
+
+  time += 1200;
+  s.heartbeat({ actor: 'codex' });
+
+  time += 900;
   const after = s.getTask(a.id);
   assert.equal(after.status, 'todo');
   assert.equal(after.assignee, null);
