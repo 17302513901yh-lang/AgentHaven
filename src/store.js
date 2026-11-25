@@ -159,11 +159,12 @@ function upgradeTask(t) {
 }
 
 class Store {
-  constructor({ dataDir = defaultDataDir(), workspace = 'default', leaseMs = LEASE_MS } = {}) {
+  constructor({ dataDir = defaultDataDir(), workspace = 'default', leaseMs = LEASE_MS, now = () => Date.now() } = {}) {
     if (!WORKSPACE_RE.test(workspace)) throw new ValidationError('invalid workspace name');
     this.dataDir = dataDir;
     this.workspace = workspace;
     this.leaseMs = leaseMs;
+    this.now = now;
     this.file = path.join(dataDir, `${workspace}.json`);
     fs.mkdirSync(dataDir, { recursive: true });
   }
@@ -232,25 +233,49 @@ class Store {
   }
 
   lease(task) {
-    task.leaseUntil = task.status === 'doing' && task.assignee ? new Date(Date.now() + this.leaseMs).toISOString() : null;
+    task.leaseUntil = task.status === 'doing' && task.assignee
+      ? new Date(this.now() + this.leaseMs).toISOString()
+      : null;
   }
 
   // Returns tasks whose agent went quiet past the lease to the board.
   reap(data) {
-    const t0 = Date.now();
-    for (const task of data.tasks) {
-      if (task.status !== 'doing' || !task.assignee || !task.leaseUntil || Date.parse(task.leaseUntil) > t0) continue;
-      const from = task.assignee;
-      task.handoffs.push({ at: now(), from, to: null, summary: `Lease expired: no sign of life from ${from} for ${Math.round(this.leaseMs / 60000)} min. Back on the board.`, nextSteps: '', auto: true });
-      Object.assign(task, { assignee: null, status: 'todo', leaseUntil: null, updatedAt: now(), lastActor: 'agenthaven', version: task.version + 1 });
-      Store.log(data, 'agenthaven', 'task.lease_expired', task.id, { from });
-      task.counters.expiries += 1;
-      if (task.counters.expiries >= ESCALATE_AT) Store.escalate(data, task, `claims expired ${task.counters.expiries} times: the task is probably too big or unclear (split it or clarify it)`);
+  const t0 = this.now();
+
+  for (const task of data.tasks) {
+    if (task.status !== 'doing' || !task.assignee || !task.leaseUntil || Date.parse(task.leaseUntil) > t0) continue;
+
+    const from = task.assignee;
+
+    task.handoffs.push({
+      at: new Date(this.now()).toISOString(),
+      from,
+      to: null,
+      summary: `Lease expired: no sign of life from ${from} for ${Math.round(this.leaseMs / 60000)} min. Back on the board.`,
+      nextSteps: '',
+      auto: true
+    });
+
+    Object.assign(task, {
+      assignee: null,
+      status: 'todo',
+      leaseUntil: null,
+      updatedAt: new Date(this.now()).toISOString(),
+      lastActor: 'agenthaven',
+      version: task.version + 1
+    });
+
+    Store.log(data, 'agenthaven', 'task.lease_expired', task.id, { from });
+    task.counters.expiries += 1;
+
+    if (task.counters.expiries >= ESCALATE_AT) {
+      Store.escalate(data, task, `claims expired ${task.counters.expiries} times: the task is probably too big or unclear (split it or clarify it)`);
     }
   }
+}
 
   hasExpired(data) {
-    const t0 = Date.now();
+    const t0 = this.now();
     return data.tasks.some((t) => t.status === 'doing' && t.assignee && t.leaseUntil && Date.parse(t.leaseUntil) <= t0);
   }
 
