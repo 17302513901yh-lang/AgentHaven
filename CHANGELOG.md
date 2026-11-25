@@ -5,6 +5,7 @@ and the installers are on the [Releases page](https://github.com/laaielichter/Ag
 
 ## Unreleased
 
+- **`agenthaven <command> --help` shows the usage instead of running the command:** `status --help`, `serve --help`, `connect -h` and the rest print the usage and exit 0 without reading or writing anything, so `connect --help` no longer writes agent-app config files and `serve --help` no longer starts the dashboard. `hook` behaves as before. Thanks to @monkey9-Cyber-cat-Spidy! (#179, #182)
 - **The README opening, Quickstart and "Why AgentHaven" table in Spanish** (`docs/translations/README.es.md`), with the English README commit it was translated from and a link from the English README. Thanks to @Daiyuanranfeng! (#51, #177)
 - **Agents can no longer release or remove quarantined notes through the HTTP API:** an agent that sent `X-AgentHaven-Agent: you` could release its own quarantined note. The release and remove routes now refuse any request that carries the agent header, so only the person at the dashboard decides. Thanks to @jdotc1! (#165)
 - **Guard strips terminal control sequences from shared memory:** CSI and OSC sequences, including OSC 8 hyperlinks and screen clears, are removed before text is stored and the text is flagged, while ordinary Unicode, emoji and plain text stay unchanged. Thanks to @jdotc1! (#166)
