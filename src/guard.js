@@ -112,6 +112,8 @@ const SECRET_RULES = [
   // boundary in front: in an API URL the token follows `bot` directly.
   ['Telegram bot token', /(?<!\d)\d{8,16}:[A-Za-z0-9_-]{35}(?![A-Za-z0-9_-])/g, isTelegramBotToken],
   ['AWS access key', /\b(?:AKIA|ASIA)[0-9A-Z]{16}\b/g],
+  // Azure DevOps PATs are 84 alphanumerics with AZDO at offset 75 (Microsoft format).
+  ['Azure DevOps PAT', /(?<![A-Za-z0-9_-])[A-Za-z0-9]{75}AZDO[A-Za-z0-9]{5}(?![A-Za-z0-9_-])/g],
   // Cloud Storage V4 signed URLs carry HMAC (64 hex) or longer RSA
   // signatures that grant temporary object access without other credentials.
   ['Google Cloud Storage signed URL signature', /(?<=X-Goog-Signature=)[a-f0-9]{64,1024}(?![A-Za-z0-9_%])/gi],
