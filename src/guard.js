@@ -78,6 +78,8 @@ const SECRET_RULES = [
   // The webhook URL itself grants unauthenticated posting access.
   ['Discord webhook URL', /\bhttps:\/\/(?:discord|discordapp)\.com\/api(?:\/v\d{1,2})?\/webhooks\/\d{17,20}\/[A-Za-z0-9_-]{30,128}(?![A-Za-z0-9_-])/g],
   ['GitHub token', /\b(?:gh[pousr]_[A-Za-z0-9]{30,}|github_pat_[A-Za-z0-9_]{40,})/g],
+  // Bitbucket API tokens use ATAT headers; match the 192-character current format.
+  ['Bitbucket API token', /(?<![A-Za-z0-9_-])ATATT3xFfGF0[A-Za-z0-9_-]{171}=[0-9A-F]{8}(?![A-Za-z0-9_=-])/g],
   ['GitLab token', /\bglpat-[A-Za-z0-9_-]{20,}/g],
   // GitLab CI job tokens grant scoped access while a pipeline runs.
   // Handle both legacy opaque tokens and the newer three-segment JWT form;
